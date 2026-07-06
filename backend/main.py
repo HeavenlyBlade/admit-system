@@ -33,33 +33,30 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 60)
     logger.info("ADMIT System Starting Up")
     logger.info("=" * 60)
-    
+
+    # Initialize database (non-blocking - warns but doesn't crash)
     try:
-    try:
-        # Initialize database (create tables if needed)
         logger.info("Initializing database...")
         await init_db()
         logger.info("✓ Database initialized")
     except Exception as e:
-        logger.warning(f"Database initialization failed (will retry on first request): {str(e)}")
-        
-        # Preload embedding model
+        logger.warning(f"Database init warning (will retry on first request): {str(e)}")
+
+    # Preload embedding model
+    try:
         logger.info("Loading embedding model...")
         load_model()
         logger.info("✓ Embedding model loaded and cached")
-        
-        logger.info("=" * 60)
-        logger.info("ADMIT System Ready")
-        logger.info("=" * 60)
-        logger.info("API Documentation: http://localhost:8000/docs")
-        logger.info("=" * 60)
-        
     except Exception as e:
-        logger.error(f"Startup failed: {str(e)}")
-        raise
-    
+        logger.warning(f"Embedding model load warning: {str(e)}")
+
+    logger.info("=" * 60)
+    logger.info("ADMIT System Ready")
+    logger.info("API Documentation: http://localhost:8000/docs")
+    logger.info("=" * 60)
+
     yield
-    
+
     # Shutdown
     logger.info("ADMIT System shutting down...")
 
