@@ -91,6 +91,7 @@ app.include_router(admin.router)
 async def debug_env():
     """Temporary debug endpoint - remove after fixing DB connection."""
     import os
+    from db.database import CLEAN_URL
     db_url = os.getenv("DATABASE_URL", "NOT SET")
     # Show first 3 chars of password to verify which version is loaded
     if "@" in db_url:
@@ -100,7 +101,20 @@ async def debug_env():
         masked = ":".join(user_part[:-1]) + f":{password[:3]}***@" + parts[1]
     else:
         masked = db_url
-    return {"DATABASE_URL": masked}
+    
+    # Also show clean URL
+    if "@" in CLEAN_URL:
+        parts = CLEAN_URL.split("@")
+        user_part = parts[0].split(":")
+        password = user_part[-1]
+        clean_masked = ":".join(user_part[:-1]) + f":{password[:3]}***@" + parts[1]
+    else:
+        clean_masked = CLEAN_URL
+
+    return {
+        "DATABASE_URL_raw": masked,
+        "DATABASE_URL_clean": clean_masked,
+    }
 
 
 @app.get("/health")

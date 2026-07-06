@@ -10,22 +10,48 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Database URL from environment
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is not set")
 
-# Create async engine with connection pooling
+# Parse DATABASE_URL manually to handle special characters in password
+def build_engine_url(url: str) -> str:
+    """
+    Ensure the URL uses asyncpg driver and handle special characters.
+    Supabase pooler works best with explicit SSL via connect_args.
+    """
+    # Normalize driver prefix
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+    elif url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    
+    # Remove any existing ssl param from URL (we pass it via connect_args)
+    if "?ssl=" in url:
+        url = url.split("?ssl=")[0]
+    if "&ssl=" in url:
+        url = url.split("&ssl=")[0]
+    
+    return url
+
+
+CLEAN_URL = build_engine_url(DATABASE_URL)
+
+# SSL required for Supabase
+CONNECT_ARGS = {"ssl": "require"}
+
+# Create async engine
 engine = create_async_engine(
-    DATABASE_URL,
-    pool_size=10,
-    max_overflow=20,
-    pool_pre_ping=True,  # Verify connections before using
-    echo=False,  # Set to True for SQL query logging in development
+    CLEAN_URL,
+    connect_args=CONNECT_ARGS,
+    pool_size=5,
+    max_overflow=10,
+    pool_pre_ping=True,
+    echo=False,
 )
 
-# Create async session factory
+# Session factory
 AsyncSessionLocal = async_sessionmaker(
     engine,
     class_=AsyncSession,
@@ -34,35 +60,19 @@ AsyncSessionLocal = async_sessionmaker(
     autoflush=False,
 )
 
-# Base class for ORM models
 Base = declarative_base()
 
 
 async def init_db():
-    """
-    Initialize database: create tables and enable pgvector extension.
-    Should be called on application startup.
-    """
+    """Initialize database tables and pgvector extension."""
     from sqlalchemy import text
     async with engine.begin() as conn:
-        # Enable pgvector extension
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-        
-        # Create all tables
         await conn.run_sync(Base.metadata.create_all)
 
 
 async def get_db() -> AsyncSession:
-    """
-    Dependency function to get database session.
-    Use with FastAPI's Depends() for automatic session management.
-    
-    Example:
-        @app.get("/items")
-        async def read_items(db: AsyncSession = Depends(get_db)):
-            result = await db.execute(select(Item))
-            return result.scalars().all()
-    """
+    """FastAPI dependency for database sessions."""
     async with AsyncSessionLocal() as session:
         try:
             yield session
@@ -76,14 +86,7 @@ async def get_db() -> AsyncSession:
 
 @asynccontextmanager
 async def get_db_context():
-    """
-    Context manager for database session outside of FastAPI routes.
-    
-    Example:
-        async with get_db_context() as db:
-            result = await db.execute(select(User))
-            users = result.scalars().all()
-    """
+    """Context manager for database sessions outside FastAPI routes."""
     async with AsyncSessionLocal() as session:
         try:
             yield session
