@@ -87,6 +87,21 @@ app.include_router(admin.router)
 
 
 # Health check endpoint
+@app.get("/debug-env")
+async def debug_env():
+    """Temporary debug endpoint - remove after fixing DB connection."""
+    import os
+    db_url = os.getenv("DATABASE_URL", "NOT SET")
+    # Mask the password for security
+    if "@" in db_url:
+        parts = db_url.split("@")
+        user_part = parts[0].split(":")
+        masked = ":".join(user_part[:-1]) + ":***@" + parts[1]
+    else:
+        masked = db_url
+    return {"DATABASE_URL": masked}
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint showing DB and service status."""
