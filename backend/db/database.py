@@ -24,7 +24,10 @@ CLEAN_URL = DATABASE_URL
 
 engine = create_async_engine(
     DATABASE_URL,
-    connect_args={"ssl": "require"},
+    connect_args={
+        "ssl": "require",
+        "statement_cache_size": 0,  # Required for Supabase pgbouncer transaction mode
+    },
     pool_size=5,
     max_overflow=10,
     pool_pre_ping=True,
