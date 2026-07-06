@@ -35,37 +35,43 @@ async def login(
     request: LoginRequest,
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Admin login - generates JWT token.
-    
-    Returns:
-        LoginResponse: Access token and token type
-    """
-    # Find admin user
-    result = await db.execute(
-        select(AdminUser).where(AdminUser.username == request.username)
-    )
-    admin_user = result.scalars().first()
-    
-    if not admin_user or not verify_password(request.password, admin_user.password_hash):
+    try:
+        result = await db.execute(
+            select(AdminUser).where(AdminUser.username == request.username)
+        )
+        admin_user = result.scalars().first()
+
+        if not admin_user or not verify_password(request.password, admin_user.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "error": {
+                        "code": "INVALID_CREDENTIALS",
+                        "message": "Invalid username or password"
+                    }
+                }
+            )
+
+        token = create_access_token(
+            data={"sub": admin_user.username, "user_id": admin_user.id}
+        )
+
+        logger.info(f"Admin user '{admin_user.username}' logged in")
+        return LoginResponse(access_token=token, token_type="bearer")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Login error: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
+            status_code=500,
             detail={
                 "error": {
-                    "code": "INVALID_CREDENTIALS",
-                    "message": "Invalid username or password"
+                    "code": "LOGIN_ERROR",
+                    "message": f"Login failed: {str(e)}"
                 }
             }
         )
-    
-    # Generate JWT token
-    token = create_access_token(
-        data={"sub": admin_user.username, "user_id": admin_user.id}
-    )
-    
-    logger.info(f"Admin user '{admin_user.username}' logged in")
-    
-    return LoginResponse(access_token=token, token_type="bearer")
 
 
 # ============================================================================

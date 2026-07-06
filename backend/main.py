@@ -10,7 +10,7 @@ import os
 
 from routers import chat, admin
 from services.embeddings import load_model
-from db.database import init_db
+from db.database import engine, init_db
 
 # Configure logging
 logging.basicConfig(
@@ -89,20 +89,25 @@ app.include_router(admin.router)
 # Health check endpoint
 @app.get("/health")
 async def health_check():
-    """
-    Health check endpoint for monitoring.
+    """Health check endpoint showing DB and service status."""
+    from sqlalchemy import text as sql_text
+    db_status = "unknown"
+    db_error = None
     
-    Returns system status and service availability.
-    """
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(sql_text("SELECT 1"))
+        db_status = "connected"
+    except Exception as e:
+        db_status = "error"
+        db_error = str(e)
+
     return {
-        "status": "healthy",
+        "status": "healthy" if db_status == "connected" else "degraded",
         "service": "ADMIT API",
         "version": "1.0.0",
-        "services": {
-            "database": "connected",
-            "embedding_model": "loaded",
-            "llm_api": "configured"
-        }
+        "database": db_status,
+        "database_error": db_error,
     }
 
 
