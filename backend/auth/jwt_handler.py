@@ -26,30 +26,26 @@ security = HTTPBearer()
 
 
 def hash_password(password: str) -> str:
-    """
-    Hash password using bcrypt.
-    
-    Args:
-        password: Plain text password
-        
-    Returns:
-        str: Hashed password
-    """
+    """Hash password using bcrypt (max 72 bytes)."""
+    # Truncate to 72 bytes max (bcrypt limitation)
+    password_bytes = password.encode('utf-8')
+    if len(password_bytes) > 72:
+        password = password_bytes[:72].decode('utf-8', errors='ignore')
     return pwd_context.hash(password)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
     Verify password against hash.
-    
-    Args:
-        plain_password: Plain text password
-        hashed_password: Bcrypt hashed password
-        
-    Returns:
-        bool: True if password matches
     """
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        # Truncate to 72 bytes max (bcrypt limitation)
+        plain_bytes = plain_password.encode('utf-8')
+        if len(plain_bytes) > 72:
+            plain_password = plain_bytes[:72].decode('utf-8', errors='ignore')
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception:
+        return False
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
