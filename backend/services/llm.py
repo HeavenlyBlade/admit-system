@@ -16,8 +16,18 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 if not GROQ_API_KEY:
     logger.warning("GROQ_API_KEY not set, LLM service will not function")
 
-# Initialize Groq client
-groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+# Initialize Groq client lazily
+_groq_client = None
+
+
+def get_groq_client():
+    """Get or initialize Groq client lazily"""
+    global _groq_client
+    if _groq_client is None:
+        if not GROQ_API_KEY:
+            raise RuntimeError("Groq API client not initialized (missing API key)")
+        _groq_client = Groq(api_key=GROQ_API_KEY)
+    return _groq_client
 
 # LLM parameters
 MODEL_NAME = "llama-3.1-8b-instant"  # Fast, good quality
@@ -109,48 +119,29 @@ def validate_response(response: str) -> bool:
 def generate_response(matches: List[KBMatch], query: str) -> str:
     """
     Generate response using Groq API with grounded prompt.
-    
-    Args:
-        matches: Retrieved KB matches
-        query: User query
-        
-    Returns:
-        str: Generated response
-        
-    Raises:
-        RuntimeError: If API call fails
     """
-    if not groq_client:
-        raise RuntimeError("Groq API client not initialized (missing API key)")
-    
-    # Build prompt
+    client = get_groq_client()
     prompt = build_prompt(matches, query)
-    
+
     try:
-        # Call Groq API
         logger.info(f"Calling Groq API (model: {MODEL_NAME})")
-        
-        completion = groq_client.chat.completions.create(
+        completion = client.chat.completions.create(
             model=MODEL_NAME,
-            messages=[
-                {"role": "user", "content": prompt}
-            ],
+            messages=[{"role": "user", "content": prompt}],
             temperature=TEMPERATURE,
             max_tokens=MAX_TOKENS,
             top_p=0.9,
-            stop=["\n\nQuestion:", "\n\nCONTEXT:"],  # Stop sequences
+            stop=["\n\nQuestion:", "\n\nCONTEXT:"],
         )
-        
         response = completion.choices[0].message.content.strip()
-        
-        # Validate response
+
         if not validate_response(response):
             logger.warning("Response failed validation, using fallback")
             return build_fallback_message(query)
-        
+
         logger.info(f"Generated response ({len(response)} chars)")
         return response
-        
+
     except Exception as e:
         logger.error(f"Groq API error: {str(e)}")
         raise RuntimeError(f"LLM generation failed: {str(e)}")
