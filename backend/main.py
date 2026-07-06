@@ -92,11 +92,12 @@ async def debug_env():
     """Temporary debug endpoint - remove after fixing DB connection."""
     import os
     db_url = os.getenv("DATABASE_URL", "NOT SET")
-    # Mask the password for security
+    # Show first 3 chars of password to verify which version is loaded
     if "@" in db_url:
         parts = db_url.split("@")
         user_part = parts[0].split(":")
-        masked = ":".join(user_part[:-1]) + ":***@" + parts[1]
+        password = user_part[-1]
+        masked = ":".join(user_part[:-1]) + f":{password[:3]}***@" + parts[1]
     else:
         masked = db_url
     return {"DATABASE_URL": masked}
