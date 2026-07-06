@@ -186,8 +186,9 @@ async def setup_database():
             """))
             results.append("✓ KB categories seeded")
 
-            # Seed admin user
-            password_hash = pwd_context.hash("admin123")
+            # Seed admin user using auth handler (handles 72-byte bcrypt limit)
+            from auth.jwt_handler import hash_password
+            password_hash = hash_password("admin123")
             await conn.execute(sql_text(
                 "INSERT INTO admin_users (username, password_hash, role) "
                 "VALUES (:username, :password_hash, :role) "
