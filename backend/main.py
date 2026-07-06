@@ -35,10 +35,13 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 60)
     
     try:
+    try:
         # Initialize database (create tables if needed)
         logger.info("Initializing database...")
         await init_db()
         logger.info("✓ Database initialized")
+    except Exception as e:
+        logger.warning(f"Database initialization failed (will retry on first request): {str(e)}")
         
         # Preload embedding model
         logger.info("Loading embedding model...")
