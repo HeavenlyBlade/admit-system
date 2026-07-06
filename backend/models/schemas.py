@@ -4,7 +4,8 @@ Includes support for pgvector embeddings and PostgreSQL-specific types.
 """
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, ARRAY, CheckConstraint
 from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import UUID, VECTOR
+from sqlalchemy.dialects.postgresql import UUID
+from pgvector.sqlalchemy import Vector
 from datetime import datetime
 import uuid
 from db.database import Base
@@ -37,7 +38,7 @@ class KnowledgeBase(Base):
     category_id = Column(Integer, ForeignKey("kb_categories.id"), nullable=False)
     title = Column(String(255), nullable=False)
     content = Column(Text, nullable=False)
-    embedding = Column(VECTOR(384), nullable=False)  # 384-dim for all-MiniLM-L6-v2
+    embedding = Column(Vector(384), nullable=False)  # 384-dim for all-MiniLM-L6-v2
     is_active = Column(Boolean, default=True, nullable=False)
     updated_by = Column(Integer, ForeignKey("admin_users.id"), nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
