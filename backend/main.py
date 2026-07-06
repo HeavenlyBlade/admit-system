@@ -91,18 +91,15 @@ app.include_router(admin.router)
 async def debug_env():
     """Temporary debug endpoint."""
     import os
-    db_password = os.getenv("DB_PASSWORD", "NOT SET")
-    db_host = os.getenv("DB_HOST", "NOT SET")
-    db_user = os.getenv("DB_USER", "NOT SET")
-    db_port = os.getenv("DB_PORT", "NOT SET")
-    
-    return {
-        "DB_HOST": db_host,
-        "DB_USER": db_user,
-        "DB_PORT": db_port,
-        "DB_PASSWORD_length": len(db_password),
-        "DB_PASSWORD_chars": [ord(c) for c in db_password],  # ASCII codes - reveals invisible chars
-    }
+    db_url = os.getenv("DATABASE_URL", "NOT SET")
+    if "@" in db_url:
+        parts = db_url.split("@")
+        user_part = parts[0].split(":")
+        password = user_part[-1]
+        masked = ":".join(user_part[:-1]) + f":{password[:4]}***@" + parts[1]
+    else:
+        masked = db_url
+    return {"DATABASE_URL": masked}
 
 
 @app.get("/health")
