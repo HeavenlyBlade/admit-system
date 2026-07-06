@@ -189,9 +189,13 @@ async def setup_database():
             # Seed admin user
             password_hash = pwd_context.hash("admin123")
             await conn.execute(sql_text(
-                f"INSERT INTO admin_users (username, password_hash, role) "
-                f"VALUES ('admin', '{password_hash}', 'admin') "
-                f"ON CONFLICT (username) DO NOTHING"
+                "INSERT INTO admin_users (username, password_hash, role) "
+                "VALUES (:username, :password_hash, :role) "
+                "ON CONFLICT (username) DO UPDATE SET password_hash = :password_hash"
+            ).bindparams(
+                username="admin",
+                password_hash=password_hash,
+                role="admin"
             ))
             results.append("✓ Admin user created (admin/admin123)")
 
