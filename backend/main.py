@@ -89,31 +89,19 @@ app.include_router(admin.router)
 # Health check endpoint
 @app.get("/debug-env")
 async def debug_env():
-    """Temporary debug endpoint - remove after fixing DB connection."""
+    """Temporary debug endpoint."""
     import os
-    from db.database import CLEAN_URL
-    db_url = os.getenv("DATABASE_URL", "NOT SET")
-    # Show first 3 chars of password to verify which version is loaded
-    if "@" in db_url:
-        parts = db_url.split("@")
-        user_part = parts[0].split(":")
-        password = user_part[-1]
-        masked = ":".join(user_part[:-1]) + f":{password[:3]}***@" + parts[1]
-    else:
-        masked = db_url
+    db_password = os.getenv("DB_PASSWORD", "NOT SET")
+    db_host = os.getenv("DB_HOST", "NOT SET")
+    db_user = os.getenv("DB_USER", "NOT SET")
+    db_port = os.getenv("DB_PORT", "NOT SET")
     
-    # Also show clean URL
-    if "@" in CLEAN_URL:
-        parts = CLEAN_URL.split("@")
-        user_part = parts[0].split(":")
-        password = user_part[-1]
-        clean_masked = ":".join(user_part[:-1]) + f":{password[:3]}***@" + parts[1]
-    else:
-        clean_masked = CLEAN_URL
-
     return {
-        "DATABASE_URL_raw": masked,
-        "DATABASE_URL_clean": clean_masked,
+        "DB_HOST": db_host,
+        "DB_USER": db_user,
+        "DB_PORT": db_port,
+        "DB_PASSWORD_length": len(db_password),
+        "DB_PASSWORD_chars": [ord(c) for c in db_password],  # ASCII codes - reveals invisible chars
     }
 
 
