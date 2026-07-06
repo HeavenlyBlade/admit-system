@@ -147,12 +147,9 @@ async def health_check():
 async def setup_database():
     """
     One-time setup: run migration and seed initial data.
-    Run this once after deployment to initialize tables and admin user.
     """
     from sqlalchemy import text as sql_text
-    from passlib.context import CryptContext
-
-    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    from auth.jwt_handler import hash_password
     results = []
 
     try:
@@ -186,8 +183,7 @@ async def setup_database():
             """))
             results.append("✓ KB categories seeded")
 
-            # Seed admin user using auth handler (handles 72-byte bcrypt limit)
-            from auth.jwt_handler import hash_password
+            # Seed admin user
             password_hash = hash_password("admin123")
             await conn.execute(sql_text(
                 "INSERT INTO admin_users (username, password_hash, role) "
