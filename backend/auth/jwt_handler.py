@@ -1,16 +1,14 @@
 """
 JWT authentication handler for admin endpoints.
-Handles token generation, validation, and password hashing.
 """
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import bcrypt
 import os
 
-# JWT Configuration
 SECRET_KEY = os.getenv("JWT_SECRET")
 if not SECRET_KEY:
     raise ValueError("JWT_SECRET environment variable is not set")
@@ -18,32 +16,23 @@ if not SECRET_KEY:
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRATION_HOURS", "24"))
 
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# HTTP Bearer token security
 security = HTTPBearer()
 
 
 def hash_password(password: str) -> str:
-    """Hash password using bcrypt (max 72 bytes)."""
-    # Truncate to 72 bytes max (bcrypt limitation)
-    password_bytes = password.encode('utf-8')
-    if len(password_bytes) > 72:
-        password = password_bytes[:72].decode('utf-8', errors='ignore')
-    return pwd_context.hash(password)
+    """Hash password using bcrypt directly."""
+    password_bytes = password.encode('utf-8')[:72]  # bcrypt max 72 bytes
+    salt = bcrypt.gensalt(rounds=12)
+    hashed = bcrypt.hashpw(password_bytes, salt)
+    return hashed.decode('utf-8')
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """
-    Verify password against hash.
-    """
+    """Verify password against bcrypt hash."""
     try:
-        # Truncate to 72 bytes max (bcrypt limitation)
-        plain_bytes = plain_password.encode('utf-8')
-        if len(plain_bytes) > 72:
-            plain_password = plain_bytes[:72].decode('utf-8', errors='ignore')
-        return pwd_context.verify(plain_password, hashed_password)
+        password_bytes = plain_password.encode('utf-8')[:72]
+        hashed_bytes = hashed_password.encode('utf-8')
+        return bcrypt.checkpw(password_bytes, hashed_bytes)
     except Exception:
         return False
 
