@@ -89,10 +89,6 @@ const LoginPage = () => {
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
-
-          <div className="mt-6 text-center text-sm text-gray-600">
-            Default: admin / admin123
-          </div>
         </div>
 
         {/* Back to Chat */}
