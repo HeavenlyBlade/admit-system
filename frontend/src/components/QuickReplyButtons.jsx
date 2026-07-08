@@ -23,13 +23,11 @@ const QuickReplyButtons = ({ onSelect }) => {
     }
   };
 
-  if (loading) {
-    return <div className="text-center text-gray-500">Loading options...</div>;
-  }
+  if (loading) return null;
 
   return (
     <div className="space-y-2">
-      <p className="text-sm text-gray-600 font-medium text-center mb-3">
+      <p className="text-sm text-white/50 font-medium text-center mb-3">
         ✨ Quick Topics
       </p>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
@@ -37,7 +35,7 @@ const QuickReplyButtons = ({ onSelect }) => {
           <button
             key={reply.id}
             onClick={() => onSelect(reply.query)}
-            className="px-4 py-3 bg-white border-2 border-sacli-green/30 text-sacli-green-dark rounded-lg font-medium text-sm hover:bg-sacli-green hover:text-white hover:border-sacli-green hover:shadow-lg transition-all transform hover:scale-105 active:scale-95"
+            className="px-4 py-3 backdrop-blur-sm bg-white/10 border border-white/20 text-white/80 rounded-xl text-sm font-medium hover:bg-yellow-500/30 hover:border-yellow-400/50 hover:text-white transition-all"
           >
             {reply.name}
           </button>

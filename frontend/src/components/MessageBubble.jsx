@@ -1,6 +1,5 @@
 /**
  * MessageBubble - Individual message display component
- * Renders user and bot messages with appropriate styling
  */
 const MessageBubble = ({ message }) => {
   const isUser = message.sender === 'user';
@@ -9,35 +8,26 @@ const MessageBubble = ({ message }) => {
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-fadeIn`}>
       <div
-        className={`max-w-[75%] rounded-2xl px-4 py-3 shadow-md ${
+        className={`max-w-[75%] rounded-2xl px-4 py-3 shadow-lg ${
           isUser
-            ? 'bg-gradient-to-r from-sacli-green to-sacli-green-dark text-white rounded-br-none'
+            ? 'bg-yellow-500/80 backdrop-blur text-white rounded-br-none border border-yellow-400/30'
             : isError
-            ? 'bg-red-50 text-red-700 border-2 border-red-200 rounded-bl-none'
-            : 'bg-white text-gray-800 border-2 border-sacli-gold/20 rounded-bl-none'
+            ? 'bg-red-500/20 backdrop-blur text-red-200 border border-red-400/30 rounded-bl-none'
+            : 'bg-white/15 backdrop-blur text-white border border-white/20 rounded-bl-none'
         }`}
       >
-        {/* Message content */}
         <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">
           {message.content}
         </div>
-
-        {/* Timestamp */}
-        <div
-          className={`text-xs mt-2 ${
-            isUser ? 'text-sacli-gold-light' : 'text-gray-500'
-          }`}
-        >
+        <div className={`text-xs mt-2 ${isUser ? 'text-white/60' : 'text-white/40'}`}>
           {new Date(message.timestamp).toLocaleTimeString('en-US', {
             hour: '2-digit',
             minute: '2-digit',
           })}
         </div>
-
-        {/* Fallback indicator (for debugging) */}
         {message.wasFallback && (
-          <div className="text-xs text-gray-500 mt-1 italic">
-            ℹ️ Out of scope - contact office suggested
+          <div className="text-xs text-white/40 mt-1 italic">
+            ℹ️ Redirected to office
           </div>
         )}
       </div>

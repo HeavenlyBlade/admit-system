@@ -49,7 +49,7 @@ const LoginPage = () => {
         {/* Logo + Title */}
         <div className="flex flex-col items-center mb-8">
           <img
-            src="/logo.png"
+            src="/40THAnniv_Logo.png"
             alt="SACLI Logo"
             className="w-24 h-24 object-contain drop-shadow-lg mb-4"
           />
