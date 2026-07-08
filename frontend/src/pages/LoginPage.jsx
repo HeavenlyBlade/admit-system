@@ -1,5 +1,5 @@
 /**
- * LoginPage - Admin authentication page
+ * LoginPage - Admin authentication page with background video
  */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -16,7 +16,6 @@ const LoginPage = () => {
     e.preventDefault();
     setError('');
     setLoading(true);
-
     try {
       await login(username, password);
       navigate('/admin/dashboard');
@@ -28,33 +27,55 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sacli-green to-sacli-green-dark flex items-center justify-center px-4">
-      <div className="max-w-md w-full">
-        {/* Logo/Title */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">
-            ADMIT Admin
+    <div className="relative min-h-screen flex items-center justify-center overflow-hidden">
+
+      {/* Background Video */}
+      <video
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="absolute inset-0 w-full h-full object-cover z-0"
+      >
+        <source src="/bg-video.mp4" type="video/mp4" />
+      </video>
+
+      {/* Dark overlay for readability */}
+      <div className="absolute inset-0 bg-black/55 z-10" />
+
+      {/* Content */}
+      <div className="relative z-20 w-full max-w-md px-6 py-10">
+
+        {/* Logo + Title */}
+        <div className="flex flex-col items-center mb-8">
+          <img
+            src="/logo.png"
+            alt="SACLI Logo"
+            className="w-24 h-24 object-contain drop-shadow-lg mb-4"
+          />
+          <h1 className="text-4xl font-bold text-white drop-shadow-md tracking-wide">
+            ADMIT
           </h1>
-          <p className="text-sacli-gold-light">
-            Knowledge Base Management System
+          <p className="text-yellow-300 text-sm mt-1 tracking-widest uppercase font-medium">
+            Admin Portal
           </p>
         </div>
 
-        {/* Login Card */}
-        <div className="bg-white rounded-lg shadow-2xl p-8">
-          <h2 className="text-2xl font-bold text-sacli-green mb-6 text-center">
-            Sign In
+        {/* Glass Card */}
+        <div className="backdrop-blur-md bg-white/10 border border-white/20 rounded-2xl shadow-2xl p-8">
+          <h2 className="text-xl font-semibold text-white text-center mb-6">
+            Sign in to your account
           </h2>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+            <div className="mb-4 px-4 py-3 bg-red-500/20 border border-red-400/40 rounded-lg text-red-200 text-sm">
               {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-white/80 mb-1">
                 Username
               </label>
               <input
@@ -62,13 +83,13 @@ const LoginPage = () => {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sacli-green focus:border-transparent"
-                placeholder="Enter your username"
+                placeholder="Enter username"
+                className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/25 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-yellow-400/60 focus:border-yellow-400/60 transition"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-white/80 mb-1">
                 Password
               </label>
               <input
@@ -76,15 +97,15 @@ const LoginPage = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sacli-green focus:border-transparent"
-                placeholder="Enter your password"
+                placeholder="Enter password"
+                className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/25 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-yellow-400/60 focus:border-yellow-400/60 transition"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-gradient-to-r from-sacli-green to-sacli-green-dark text-white rounded-lg font-medium hover:shadow-lg transition-all disabled:opacity-50"
+              className="w-full py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-yellow-500 to-yellow-400 hover:from-yellow-400 hover:to-yellow-300 shadow-lg hover:shadow-yellow-400/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
@@ -92,10 +113,10 @@ const LoginPage = () => {
         </div>
 
         {/* Back to Chat */}
-        <div className="text-center mt-4">
+        <div className="text-center mt-6">
           <a
             href="/"
-            className="text-white hover:text-sacli-gold transition-colors"
+            className="text-white/60 hover:text-yellow-300 text-sm transition-colors"
           >
             ← Back to Chat
           </a>
