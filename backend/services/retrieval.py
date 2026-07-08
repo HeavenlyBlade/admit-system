@@ -56,13 +56,12 @@ async def search_kb(
         List[KBMatch]: Top K most similar KB entries with scores
     """
     try:
-        # Convert embedding to PostgreSQL vector format
+        # Convert embedding list to PostgreSQL vector string format
         embedding_str = "[" + ",".join(map(str, query_embedding)) + "]"
         
-        # Pgvector cosine similarity query
-        # Note: <=> operator returns cosine distance (0 = identical, 2 = opposite)
-        # We convert to similarity score: 1 - (distance / 2)
-        query = text("""
+        # Use raw vector literal instead of parameter binding for the embedding
+        # asyncpg doesn't support ::vector casting with named parameters
+        query = text(f"""
             SELECT 
                 kb.id,
                 kb.category_id,
@@ -71,17 +70,14 @@ async def search_kb(
                 kb.is_active,
                 kb.updated_by,
                 kb.updated_at,
-                1 - (kb.embedding <=> :embedding::vector) AS similarity_score
+                1 - (kb.embedding <=> '{embedding_str}'::vector) AS similarity_score
             FROM knowledge_base kb
             WHERE kb.is_active = true
-            ORDER BY kb.embedding <=> :embedding::vector
+            ORDER BY kb.embedding <=> '{embedding_str}'::vector
             LIMIT :top_k
         """)
         
-        result = await db.execute(
-            query,
-            {"embedding": embedding_str, "top_k": top_k}
-        )
+        result = await db.execute(query, {"top_k": top_k})
         
         rows = result.fetchall()
         
