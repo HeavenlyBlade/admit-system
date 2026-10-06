@@ -1,10 +1,9 @@
 /**
  * HomePage - Primary landing page for ADMIT
  */
-import { useNavigate } from 'react-router-dom';
+import TransitionLink from '../components/TransitionLink';
 
 const HomePage = () => {
-  const navigate = useNavigate();
 
   const quickInfoCards = [
     {
@@ -65,12 +64,12 @@ const HomePage = () => {
             Your AI-powered guide to SACLI admissions, enrollment, scholarships,
             and everything you need to start your journey.
           </p>
-          <button
-            onClick={() => navigate('/chat')}
-            className="px-10 py-4 rounded-2xl font-bold text-lg text-white bg-gradient-to-r from-yellow-500 to-yellow-400 hover:from-yellow-400 hover:to-yellow-300 shadow-2xl transition-all hover:scale-105 active:scale-95"
+          <TransitionLink
+            to="/chat"
+            className="inline-block px-10 py-4 rounded-2xl font-bold text-lg text-white bg-gradient-to-r from-yellow-500 to-yellow-400 hover:from-yellow-400 hover:to-yellow-300 shadow-2xl transition-all hover:scale-105 active:scale-95"
           >
             Chat with ADMIT
-          </button>
+          </TransitionLink>
         </section>
 
         {/* About Section */}
@@ -98,17 +97,17 @@ const HomePage = () => {
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {quickInfoCards.map((card) => (
-                <button
+                <TransitionLink
                   key={card.title}
-                  onClick={() => navigate('/chat')}
-                  className="backdrop-blur-md bg-white/10 border border-white/20 rounded-2xl p-6 text-left hover:bg-white/20 transition-all hover:scale-105 active:scale-95 shadow-lg group"
+                  to="/chat"
+                  className="block backdrop-blur-md bg-white/10 border border-white/20 rounded-2xl p-6 text-left hover:bg-white/20 transition-all hover:scale-105 active:scale-95 shadow-lg group"
                 >
                   <div className="text-3xl mb-3">{card.icon}</div>
                   <h3 className="text-white font-semibold mb-2 group-hover:text-yellow-300 transition-colors">
                     {card.title}
                   </h3>
                   <p className="text-white/60 text-sm leading-relaxed">{card.desc}</p>
-                </button>
+                </TransitionLink>
               ))}
             </div>
           </div>
