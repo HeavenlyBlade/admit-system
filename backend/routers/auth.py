@@ -63,6 +63,19 @@ async def get_optional_user(
         return None
 
 
+@router.get("/debug")
+async def auth_debug():
+    """Temporary debug endpoint — shows env var presence without exposing values."""
+    return {
+        "GOOGLE_CLIENT_ID_set": bool(GOOGLE_CLIENT_ID) and GOOGLE_CLIENT_ID != "your_google_client_id_here",
+        "GOOGLE_CLIENT_SECRET_set": bool(GOOGLE_CLIENT_SECRET) and GOOGLE_CLIENT_SECRET != "your_google_client_secret_here",
+        "FRONTEND_URL": FRONTEND_URL,
+        "BACKEND_URL": BACKEND_URL,
+        "GOOGLE_STATE_SECRET_len": len(GOOGLE_STATE_SECRET),
+        "GOOGLE_STATE_SECRET_is_placeholder": GOOGLE_STATE_SECRET == "changeme-state-secret",
+    }
+
+
 @router.get("/google")
 async def google_login():
     """Redirect user to Google OAuth consent screen."""
@@ -77,6 +90,7 @@ async def google_login():
         "state": state,
     })
 
+    logger.info(f"OAuth login: redirect_uri={BACKEND_URL}/api/auth/google/callback, client_id_set={bool(GOOGLE_CLIENT_ID)}, secret_set={bool(GOOGLE_CLIENT_SECRET)}, state_secret_len={len(GOOGLE_STATE_SECRET)}")
     return RedirectResponse(url=f"{GOOGLE_AUTH_URL}?{params}")
 
 
@@ -91,8 +105,12 @@ async def google_callback(
     signer = TimestampSigner(GOOGLE_STATE_SECRET)
     try:
         signer.unsign(state, max_age=600)
-    except (SignatureExpired, BadSignature):
-        raise HTTPException(status_code=400, detail="Invalid or expired OAuth state")
+    except (SignatureExpired, BadSignature) as e:
+        logger.error(f"State verification failed: {e!r} | state={state!r} | secret_len={len(GOOGLE_STATE_SECRET)}")
+        raise HTTPException(status_code=400, detail=f"Invalid or expired OAuth state: {str(e)}")
+    except Exception as e:
+        logger.error(f"Unexpected state error: {e!r}")
+        raise HTTPException(status_code=400, detail=f"State error: {str(e)}")
 
     # 2. Exchange code for access token
     async with httpx.AsyncClient() as client:
