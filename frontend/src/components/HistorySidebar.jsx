@@ -44,10 +44,11 @@ function groupSessions(sessions) {
 }
 
 const HistorySidebar = ({ isOpen, onClose, onSessionSelect, currentSessionId }) => {
-  const { user, token, isAuthenticated, login } = useAuth();
+  const { user, token, isAuthenticated, login, logout } = useAuth();
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
 
   useEffect(() => {
     if (isOpen && isAuthenticated && token) {
@@ -125,7 +126,7 @@ const HistorySidebar = ({ isOpen, onClose, onSessionSelect, currentSessionId }) 
             </div>
           ) : (
             <>
-              {/* User info strip */}
+              {/* User info strip + sign out */}
               <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10">
                 {user?.avatar_url ? (
                   <img
@@ -142,6 +143,16 @@ const HistorySidebar = ({ isOpen, onClose, onSessionSelect, currentSessionId }) 
                   <p className="text-sm font-medium text-white truncate">{user?.name}</p>
                   <p className="text-xs text-white/40 truncate">{user?.email}</p>
                 </div>
+                <button
+                  onClick={() => setShowSignOutConfirm(true)}
+                  className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/10 text-white/40 hover:text-red-400 transition-colors"
+                  aria-label="Sign out"
+                  title="Sign out"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h6a2 2 0 012 2v1" />
+                  </svg>
+                </button>
               </div>
 
               {/* Session list */}
@@ -197,6 +208,29 @@ const HistorySidebar = ({ isOpen, onClose, onSessionSelect, currentSessionId }) 
             </>
           )}
         </div>
+      {/* Sign out confirmation modal */}
+      {showSignOutConfirm && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-gray-900 border border-white/15 rounded-2xl p-6 mx-4 shadow-2xl text-center">
+            <p className="text-white font-semibold mb-1">Sign out?</p>
+            <p className="text-white/50 text-sm mb-5">Your chat history will be saved and available next time you sign in.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowSignOutConfirm(false)}
+                className="flex-1 py-2 rounded-xl border border-white/20 text-white/70 hover:bg-white/10 text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { logout(); setShowSignOutConfirm(false); onClose(); }}
+                className="flex-1 py-2 rounded-xl bg-red-500/80 hover:bg-red-500 text-white text-sm font-semibold transition-colors"
+              >
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </>
   );

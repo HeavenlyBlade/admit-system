@@ -76,7 +76,9 @@ async def get_session(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
 
     result = await db.execute(
-        select(Conversation).where(Conversation.session_id.cast(str) == session_id)
+        select(Conversation).where(
+            Conversation.session_id == session_id
+        )
     )
     conversation = result.scalars().first()
 
