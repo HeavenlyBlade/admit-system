@@ -5,7 +5,7 @@ import TransitionLink from '../components/TransitionLink';
 import { useAuth } from '../context/AuthContext';
 
 const HomePage = () => {
-  const { user, login, isAuthenticated } = useAuth();
+  const { user, login, logout, isAuthenticated } = useAuth();
 
   const quickInfoCards = [
     {
@@ -93,12 +93,20 @@ const HomePage = () => {
                     <p className="text-white font-semibold text-lg">{user.name}</p>
                     <p className="text-white/50 text-sm truncate">{user.email}</p>
                   </div>
+              <div className="flex flex-col gap-3 w-full">
                   <TransitionLink
                     to="/chat"
                     className="w-full text-center px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-yellow-500 to-yellow-400 hover:from-yellow-400 hover:to-yellow-300 shadow-lg transition-all hover:scale-105"
                   >
                     Continue to Chat →
                   </TransitionLink>
+                  <button
+                    onClick={() => { if (window.confirm('Sign out of ADMIT?')) logout(); }}
+                    className="w-full px-6 py-2.5 rounded-xl text-sm text-white/60 hover:text-red-400 border border-white/10 hover:border-red-400/30 hover:bg-red-500/10 transition-all"
+                  >
+                    Sign Out
+                  </button>
+                </div>
                 </div>
               ) : (
                 /* Sign in prompt */
