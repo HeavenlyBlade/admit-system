@@ -90,6 +90,16 @@ app.include_router(auth_router, prefix="/api/auth")
 app.include_router(sessions_router, prefix="/api")
 
 
+@app.post("/api/migrate")
+async def run_migration():
+    """Force-create all database tables. Safe to call multiple times (CREATE IF NOT EXISTS)."""
+    try:
+        await init_db()
+        return {"status": "ok", "message": "Database tables created/verified"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint showing DB and service status."""

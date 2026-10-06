@@ -55,8 +55,8 @@ const HistorySidebar = ({ isOpen, onClose, onSessionSelect, currentSessionId }) 
       setLoading(true);
       setError(null);
       getSessions(token)
-        .then((data) => setSessions(data))
-        .catch(() => setError('Failed to load history'))
+        .then((data) => { setSessions(Array.isArray(data) ? data : []); })
+        .catch(() => setError('Failed to load history. Please try again.'))
         .finally(() => setLoading(false));
     }
   }, [isOpen, isAuthenticated, token]);

@@ -49,6 +49,7 @@ async def get_optional_user(
     """
     Dependency that returns the User ORM object if a valid Bearer token is
     provided, or None if there is no token or the token is invalid.
+    Never raises — always returns None on any error.
     """
     if not token:
         return None
