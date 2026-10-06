@@ -86,22 +86,6 @@ app.include_router(chat.router)
 app.include_router(admin.router)
 
 
-# Health check endpoint
-@app.get("/debug-env")
-async def debug_env():
-    """Temporary debug endpoint."""
-    import os
-    db_url = os.getenv("DATABASE_URL", "NOT SET")
-    if "@" in db_url:
-        parts = db_url.split("@")
-        user_part = parts[0].split(":")
-        password = user_part[-1]
-        masked = ":".join(user_part[:-1]) + f":{password[:4]}***@" + parts[1]
-    else:
-        masked = db_url
-    return {"DATABASE_URL": masked}
-
-
 @app.get("/health")
 async def health_check():
     """Health check endpoint showing DB and service status."""
@@ -143,65 +127,6 @@ async def health_check():
     }
 
 
-@app.post("/setup")
-async def setup_database():
-    """
-    One-time setup: run migration and seed initial data.
-    """
-    from sqlalchemy import text as sql_text
-    from auth.jwt_handler import hash_password
-    results = []
-
-    try:
-        async with engine.begin() as conn:
-            # Enable pgvector
-            await conn.execute(sql_text("CREATE EXTENSION IF NOT EXISTS vector"))
-            results.append("✓ pgvector extension enabled")
-
-            # Create tables
-            await conn.run_sync(Base.metadata.create_all)
-            results.append("✓ Tables created")
-
-            # Seed categories
-            await conn.execute(sql_text("""
-                INSERT INTO kb_categories (name, department) VALUES
-                ('Admission Requirements','IBED'),('Enrollment Steps','IBED'),
-                ('Programs Offered','IBED'),('Tuition and Payment','IBED'),
-                ('Scholarships','IBED'),('Contact Information','IBED'),
-                ('Admission Requirements','SHS'),('Enrollment Steps','SHS'),
-                ('Programs Offered','SHS'),('Tuition and Payment','SHS'),
-                ('Scholarships','SHS'),('Contact Information','SHS'),
-                ('Admission Requirements','HED'),('Enrollment Steps','HED'),
-                ('Programs Offered','HED'),('Tuition and Payment','HED'),
-                ('Scholarships','HED'),('Contact Information','HED'),
-                ('Admission Requirements','TESDA'),('Enrollment Steps','TESDA'),
-                ('Programs Offered','TESDA'),('Tuition and Payment','TESDA'),
-                ('Scholarships','TESDA'),('Contact Information','TESDA'),
-                ('About SACLI','GENERAL'),('Campus Facilities','GENERAL'),
-                ('Student Services','GENERAL')
-                ON CONFLICT DO NOTHING
-            """))
-            results.append("✓ KB categories seeded")
-
-            # Seed admin user
-            password_hash = hash_password("admin123")
-            await conn.execute(sql_text(
-                "INSERT INTO admin_users (username, password_hash, role) "
-                "VALUES (:username, :password_hash, :role) "
-                "ON CONFLICT (username) DO UPDATE SET password_hash = :password_hash"
-            ).bindparams(
-                username="admin",
-                password_hash=password_hash,
-                role="admin"
-            ))
-            results.append("✓ Admin user created (admin/admin123)")
-
-        return {"status": "success", "steps": results}
-
-    except Exception as e:
-        return {"status": "error", "message": str(e), "steps": results}
-
-
 # Root endpoint
 @app.get("/")
 async def root():
@@ -216,7 +141,6 @@ async def root():
         "endpoints": {
             "chat": "/api/chat",
             "quick_replies": "/api/quick-replies",
-            "admin_login": "/api/admin/login",
             "health": "/health"
         }
     }

@@ -1,6 +1,5 @@
 """
 Admin router for knowledge base management and analytics.
-All endpoints require JWT authentication (except login).
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,66 +11,16 @@ import logging
 
 from db.database import get_db
 from models.pydantic_schemas import (
-    LoginRequest, LoginResponse,
     KBEntryCreate, KBEntryUpdate, KBEntryResponse, KBEntryListResponse,
     ConversationLogsResponse, ConversationResponse, MessageResponse,
     AnalyticsResponse, TopUnansweredQuery
 )
-from models.schemas import AdminUser, KnowledgeBase, KBCategory, Conversation, Message
-from auth.jwt_handler import create_access_token, verify_password, get_current_user
+from models.schemas import KnowledgeBase, KBCategory, Conversation, Message
 from services.embeddings import embed
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
-
-
-# ============================================================================
-# Authentication Endpoints
-# ============================================================================
-
-@router.post("/login", response_model=LoginResponse)
-async def login(
-    request: LoginRequest,
-    db: AsyncSession = Depends(get_db)
-):
-    try:
-        result = await db.execute(
-            select(AdminUser).where(AdminUser.username == request.username)
-        )
-        admin_user = result.scalars().first()
-
-        if not admin_user or not verify_password(request.password, admin_user.password_hash):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail={
-                    "error": {
-                        "code": "INVALID_CREDENTIALS",
-                        "message": "Invalid username or password"
-                    }
-                }
-            )
-
-        token = create_access_token(
-            data={"sub": admin_user.username, "user_id": admin_user.id}
-        )
-
-        logger.info(f"Admin user '{admin_user.username}' logged in")
-        return LoginResponse(access_token=token, token_type="bearer")
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Login error: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "error": {
-                    "code": "LOGIN_ERROR",
-                    "message": f"Login failed: {str(e)}"
-                }
-            }
-        )
 
 
 # ============================================================================
@@ -86,8 +35,7 @@ async def list_kb_entries(
     category_id: Optional[int] = None,
     is_active: Optional[bool] = None,
     search: Optional[str] = None,
-    db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     List knowledge base entries with filtering and pagination.
@@ -146,8 +94,7 @@ async def list_kb_entries(
 @router.post("/kb", response_model=KBEntryResponse, status_code=status.HTTP_201_CREATED)
 async def create_kb_entry(
     request: KBEntryCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Create new knowledge base entry with automatic embedding generation.
@@ -164,7 +111,7 @@ async def create_kb_entry(
             content=request.content,
             embedding=embedding,
             is_active=request.is_active,
-            updated_by=current_user["user_id"]
+            updated_by=1
         )
         
         db.add(kb_entry)
@@ -196,8 +143,7 @@ async def create_kb_entry(
 async def update_kb_entry(
     kb_id: int,
     request: KBEntryUpdate,
-    db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Update knowledge base entry with automatic embedding regeneration.
@@ -231,7 +177,7 @@ async def update_kb_entry(
         if request.is_active is not None:
             kb_entry.is_active = request.is_active
         
-        kb_entry.updated_by = current_user["user_id"]
+        kb_entry.updated_by = 1
         kb_entry.updated_at = datetime.utcnow()
         
         await db.refresh(kb_entry, ["category"])
@@ -258,8 +204,7 @@ async def update_kb_entry(
 @router.delete("/kb/{kb_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_kb_entry(
     kb_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Soft delete knowledge base entry (set is_active = false).
@@ -276,7 +221,7 @@ async def delete_kb_entry(
         )
     
     kb_entry.is_active = False
-    kb_entry.updated_by = current_user["user_id"]
+    kb_entry.updated_by = 1
     kb_entry.updated_at = datetime.utcnow()
     
     await db.commit()
@@ -296,8 +241,7 @@ async def get_conversation_logs(
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
     fallback_only: Optional[bool] = None,
-    db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Retrieve conversation logs with filters.
@@ -367,8 +311,7 @@ async def get_conversation_logs(
 async def get_analytics(
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
-    db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Compute analytics metrics.
