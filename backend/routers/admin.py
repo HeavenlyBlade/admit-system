@@ -16,8 +16,11 @@ from models.pydantic_schemas import (
     AnalyticsResponse, TopUnansweredQuery
 )
 from models.schemas import KnowledgeBase, KBCategory, Conversation, Message, AdminUser
-from auth.jwt_handler import verify_password, create_access_token
+from auth.jwt_handler import create_access_token
+from passlib.context import CryptContext
 from pydantic import BaseModel
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class AdminLoginRequest(BaseModel):
     username: str
@@ -44,7 +47,7 @@ async def admin_login(
     )
     admin = result.scalars().first()
 
-    if not admin or not verify_password(request.password, admin.password_hash):
+    if not admin or not pwd_context.verify(request.password, admin.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"error": {"code": "INVALID_CREDENTIALS", "message": "Invalid username or password"}}
