@@ -1,9 +1,7 @@
 /**
  * AdminDashboard - Main admin panel with navigation tabs
  */
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { isAuthenticated, logout } from '../api/adminApi';
+import { useState } from 'react';
 import KBTable from '../components/admin/KBTable';
 import KBEditor from '../components/admin/KBEditor';
 import LogsViewer from '../components/admin/LogsViewer';
@@ -14,19 +12,6 @@ const AdminDashboard = () => {
   const [showEditor, setShowEditor] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!isAuthenticated()) {
-      navigate('/admin/login');
-    }
-  }, [navigate]);
-
-  const handleLogout = () => {
-    if (confirm('Are you sure you want to logout?')) {
-      logout();
-    }
-  };
 
   const handleEdit = (entry) => {
     setEditingEntry(entry);
@@ -76,12 +61,6 @@ const AdminDashboard = () => {
               >
                 View Chat →
               </a>
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
-              >
-                Logout
-              </button>
             </div>
           </div>
         </div>
