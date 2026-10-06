@@ -114,7 +114,11 @@ const ChatWindow = () => {
       </div>
 
       {/* Messages Area */}
-      <div className="relative z-20 flex-1 overflow-y-auto px-4 py-6">
+      <div
+        className="relative z-20 flex-1 overflow-y-auto px-4 py-6"
+        aria-live="polite"
+        aria-label="Chat messages"
+      >
         <div className="max-w-4xl mx-auto space-y-4">
 
           {/* Welcome */}
