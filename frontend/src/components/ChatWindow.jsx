@@ -8,7 +8,7 @@ import TypingIndicator from './TypingIndicator';
 import QuickReplyButtons from './QuickReplyButtons';
 import { sendMessage } from '../api/chatApi';
 
-const ChatWindow = () => {
+const ChatWindow = ({ backButton }) => {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -97,12 +97,13 @@ const ChatWindow = () => {
       <div className="absolute inset-0 bg-black/60 z-10" />
 
       {/* Header */}
-      <div className="relative z-20 backdrop-blur-md bg-black/30 border-b border-white/10 px-6 py-4">
-        <div className="max-w-4xl mx-auto flex items-center gap-4">
+      <div className="relative z-20 backdrop-blur-md bg-black/30 border-b border-white/10 px-4 py-4">
+        <div className="max-w-4xl mx-auto flex items-center gap-3">
+          {backButton && backButton}
           <img
             src="/40THAnniv_Logo.png"
             alt="SACLI Logo"
-            className="w-12 h-12 object-contain drop-shadow"
+            className="w-12 h-12 object-contain drop-shadow flex-shrink-0"
           />
           <div>
             <h1 className="text-2xl font-bold text-white tracking-wide">ADMIT</h1>
