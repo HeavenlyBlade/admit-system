@@ -18,7 +18,7 @@ const LoginPage = () => {
     setLoading(true);
     try {
       await login(username, password);
-      navigate('/admin/dashboard');
+      navigate('/admin');
     } catch (err) {
       setError(err.response?.data?.detail?.error?.message || 'Invalid credentials');
     } finally {

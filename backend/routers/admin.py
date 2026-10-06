@@ -15,7 +15,13 @@ from models.pydantic_schemas import (
     ConversationLogsResponse, ConversationResponse, MessageResponse,
     AnalyticsResponse, TopUnansweredQuery
 )
-from models.schemas import KnowledgeBase, KBCategory, Conversation, Message
+from models.schemas import KnowledgeBase, KBCategory, Conversation, Message, AdminUser
+from auth.jwt_handler import verify_password, create_access_token
+from pydantic import BaseModel
+
+class AdminLoginRequest(BaseModel):
+    username: str
+    password: str
 from services.embeddings import embed
 
 logger = logging.getLogger(__name__)
@@ -24,8 +30,36 @@ router = APIRouter(prefix="/api/admin", tags=["Admin"])
 
 
 # ============================================================================
-# Knowledge Base CRUD Endpoints
+# Admin Authentication
 # ============================================================================
+
+@router.post("/login")
+async def admin_login(
+    request: AdminLoginRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Authenticate admin user and return JWT token."""
+    result = await db.execute(
+        select(AdminUser).where(AdminUser.username == request.username)
+    )
+    admin = result.scalars().first()
+
+    if not admin or not verify_password(request.password, admin.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"error": {"code": "INVALID_CREDENTIALS", "message": "Invalid username or password"}}
+        )
+
+    token = create_access_token({
+        "sub": str(admin.id),
+        "username": admin.username,
+        "role": admin.role,
+    })
+
+    return {"access_token": token, "token_type": "bearer"}
+
+
+
 
 @router.get("/kb", response_model=KBEntryListResponse)
 async def list_kb_entries(
