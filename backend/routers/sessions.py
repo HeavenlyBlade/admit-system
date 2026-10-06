@@ -6,10 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import List, Optional
 from datetime import datetime
+import logging
 
 from db.database import get_db
 from models.schemas import Conversation, Message, User
 from routers.auth import get_optional_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Sessions"])
 
@@ -23,46 +26,51 @@ async def list_sessions(
     if not current_user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
 
-    # Fetch all conversations for this user
-    result = await db.execute(
-        select(Conversation)
-        .where(Conversation.user_id == current_user.id)
-        .order_by(Conversation.started_at.desc())
-    )
-    conversations = result.scalars().all()
-
-    sessions_out = []
-    for conv in conversations:
-        # Get first user message as title
-        first_msg_result = await db.execute(
-            select(Message)
-            .where(Message.conversation_id == conv.id, Message.sender == "user")
-            .order_by(Message.created_at.asc())
-            .limit(1)
+    try:
+        # Fetch all conversations for this user
+        result = await db.execute(
+            select(Conversation)
+            .where(Conversation.user_id == current_user.id)
+            .order_by(Conversation.started_at.desc())
         )
-        first_msg = first_msg_result.scalars().first()
+        conversations = result.scalars().all()
 
-        if first_msg:
-            title = first_msg.content
-            if len(title) > 60:
-                title = title[:60] + "..."
-        else:
-            title = "New Conversation"
+        sessions_out = []
+        for conv in conversations:
+            # Get first user message as title
+            first_msg_result = await db.execute(
+                select(Message)
+                .where(Message.conversation_id == conv.id, Message.sender == "user")
+                .order_by(Message.created_at.asc())
+                .limit(1)
+            )
+            first_msg = first_msg_result.scalars().first()
 
-        # Count messages
-        count_result = await db.execute(
-            select(func.count()).where(Message.conversation_id == conv.id)
-        )
-        message_count = count_result.scalar() or 0
+            if first_msg:
+                title = first_msg.content
+                if len(title) > 60:
+                    title = title[:60] + "..."
+            else:
+                title = "New Conversation"
 
-        sessions_out.append({
-            "session_id": str(conv.session_id),
-            "title": title,
-            "started_at": conv.started_at,
-            "message_count": message_count,
-        })
+            # Count messages
+            count_result = await db.execute(
+                select(func.count()).where(Message.conversation_id == conv.id)
+            )
+            message_count = count_result.scalar() or 0
 
-    return sessions_out
+            sessions_out.append({
+                "session_id": str(conv.session_id),
+                "title": title,
+                "started_at": conv.started_at,
+                "message_count": message_count,
+            })
+
+        return sessions_out
+
+    except Exception as e:
+        logger.error(f"Sessions list error for user {current_user.id}: {e!r}")
+        raise HTTPException(status_code=500, detail=f"Failed to load sessions: {str(e)}")
 
 
 @router.get("/sessions/{session_id}")
