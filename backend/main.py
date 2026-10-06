@@ -9,6 +9,8 @@ import logging
 import os
 
 from routers import chat, admin
+from routers.auth import router as auth_router
+from routers.sessions import router as sessions_router
 from services.embeddings import load_model
 from db.database import engine, init_db, Base
 
@@ -84,6 +86,8 @@ app.add_middleware(
 # Register routers
 app.include_router(chat.router)
 app.include_router(admin.router)
+app.include_router(auth_router, prefix="/api/auth")
+app.include_router(sessions_router, prefix="/api")
 
 
 @app.get("/health")

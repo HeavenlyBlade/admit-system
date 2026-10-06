@@ -11,6 +11,25 @@ import uuid
 from db.database import Base
 
 
+class User(Base):
+    """Google OAuth user accounts"""
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    google_id = Column(String(255), unique=True, nullable=False)
+    email = Column(String(255), unique=True, nullable=False)
+    name = Column(String(255), nullable=False)
+    avatar_url = Column(String(512), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    last_login = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationship
+    conversations = relationship("Conversation", back_populates="user")
+
+    def __repr__(self):
+        return f"<User(id={self.id}, email='{self.email}', name='{self.name}')>"
+
+
 class KBCategory(Base):
     """Knowledge base categories (Admission Requirements, Enrollment Steps, etc.)"""
     __tablename__ = "kb_categories"
@@ -69,18 +88,20 @@ class AdminUser(Base):
 
 
 class Conversation(Base):
-    """Conversation sessions for anonymous users"""
+    """Conversation sessions, optionally linked to a Google user"""
     __tablename__ = "conversations"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     session_id = Column(UUID(as_uuid=True), default=uuid.uuid4, unique=True, nullable=False)
     started_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    
-    # Relationship to messages
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    # Relationships
     messages = relationship("Message", back_populates="conversation", cascade="all, delete-orphan")
+    user = relationship("User", back_populates="conversations")
     
     def __repr__(self):
-        return f"<Conversation(id={self.id}, session_id='{self.session_id}')>"
+        return f"<Conversation(id={self.id}, session_id='{self.session_id}', user_id={self.user_id})>"
 
 
 class Message(Base):

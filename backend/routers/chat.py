@@ -5,14 +5,16 @@ Orchestrates the full RAG pipeline: retrieval → generation → logging.
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from typing import Optional
 import uuid
 import logging
 
 from db.database import get_db
 from models.pydantic_schemas import ChatRequest, ChatResponse, QuickReply
-from models.schemas import Conversation, Message
+from models.schemas import Conversation, Message, User
 from services.retrieval import retrieve_relevant_context
 from services.llm import generate_response, build_fallback_message
+from routers.auth import get_optional_user
 
 logger = logging.getLogger(__name__)
 
@@ -22,11 +24,12 @@ router = APIRouter(prefix="/api", tags=["Chat"])
 @router.post("/chat", response_model=ChatResponse)
 async def chat(
     request: ChatRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
 ):
     """
     Main chat endpoint - processes user messages through RAG pipeline.
-    
+
     Flow:
     1. Validate input and manage session
     2. Embed query and search knowledge base
@@ -45,10 +48,16 @@ async def chat(
         conversation = result.scalars().first()
         
         if not conversation:
-            conversation = Conversation(session_id=session_id)
+            conversation = Conversation(
+                session_id=session_id,
+                user_id=current_user.id if current_user else None,
+            )
             db.add(conversation)
             await db.flush()  # Get conversation.id
             logger.info(f"Created new conversation: {session_id}")
+        elif current_user and conversation.user_id is None:
+            # Associate existing anonymous conversation with the now-logged-in user
+            conversation.user_id = current_user.id
         
         # 2. Log user message
         user_message = Message(
@@ -125,7 +134,7 @@ async def chat(
 async def get_quick_replies():
     """
     Get quick reply buttons for common inquiry categories.
-    
+
     Returns predefined categories that users can tap to initiate queries.
     """
     quick_replies = [

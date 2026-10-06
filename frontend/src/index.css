@@ -51,3 +51,12 @@ body {
     transform: translateY(-20px);
   }
 }
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.sidebar-enter {
+  animation: slideInRight 0.25s ease-out forwards;
+}
