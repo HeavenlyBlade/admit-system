@@ -7,6 +7,7 @@ from sqlalchemy import select, func
 from typing import List, Optional
 from datetime import datetime
 import logging
+import uuid
 
 from db.database import get_db
 from models.schemas import Conversation, Message, User
@@ -83,9 +84,15 @@ async def get_session(
     if not current_user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
 
+    # Cast string path param to uuid.UUID so asyncpg matches the UUID column correctly
+    try:
+        session_uuid = uuid.UUID(session_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid session_id format")
+
     result = await db.execute(
         select(Conversation).where(
-            Conversation.session_id == session_id
+            Conversation.session_id == session_uuid
         )
     )
     conversation = result.scalars().first()

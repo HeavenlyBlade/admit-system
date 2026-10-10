@@ -118,6 +118,14 @@ const ChatWindow = ({ backButton }) => {
     }
   }
 
+  const handleNewChat = () => {
+    const newId = uuidv4();
+    localStorage.setItem('admit_session_id', newId);
+    setSessionId(newId);
+    setMessages([]);
+    setSidebarOpen(false);
+  };
+
   return (
     <>
       <div className="relative flex flex-col h-screen overflow-hidden">
@@ -148,6 +156,18 @@ const ChatWindow = ({ backButton }) => {
                 SACLI Admissions Assistant
               </p>
             </div>
+
+            {/* New Chat button — before history button */}
+            <button
+              onClick={handleNewChat}
+              className="w-8 h-8 rounded-full border border-white/10 hover:bg-white/10 flex items-center justify-center transition-colors flex-shrink-0"
+              aria-label="New chat"
+              title="New chat"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </button>
 
             {/* History button — right side of header */}
             <button
@@ -258,6 +278,7 @@ const ChatWindow = ({ backButton }) => {
         onClose={() => setSidebarOpen(false)}
         onSessionSelect={handleSessionSelect}
         currentSessionId={sessionId}
+        onNewChat={handleNewChat}
       />
     </>
   );

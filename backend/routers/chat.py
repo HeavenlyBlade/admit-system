@@ -40,7 +40,11 @@ async def chat(
     try:
         # 1. Session management
         session_id = request.session_id or uuid.uuid4()
-        
+        # Ensure session_id is always a uuid.UUID object so asyncpg gets the right type
+        if isinstance(session_id, str):
+            session_id = uuid.UUID(session_id)
+        logger.info(f"[chat] user={current_user.id if current_user else None} session_id={session_id} type={type(session_id).__name__}")
+
         # Get or create conversation
         result = await db.execute(
             select(Conversation).where(Conversation.session_id == session_id)
@@ -54,7 +58,7 @@ async def chat(
             )
             db.add(conversation)
             await db.flush()  # Get conversation.id
-            logger.info(f"Created new conversation: {session_id}")
+            logger.info(f"[chat] Created conversation id={conversation.id} user_id={conversation.user_id} session_id={session_id}")
         elif current_user and conversation.user_id is None:
             # Associate existing anonymous conversation with the now-logged-in user
             conversation.user_id = current_user.id
@@ -106,6 +110,7 @@ async def chat(
         db.add(bot_message)
         
         await db.commit()
+        logger.info(f"[chat] Committed conversation id={conversation.id} user_id={conversation.user_id}")
         
         # 6. Return response
         return ChatResponse(

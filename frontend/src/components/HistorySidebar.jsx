@@ -43,7 +43,7 @@ function groupSessions(sessions) {
   return order.filter((b) => buckets[b]).map((b) => ({ label: b, items: buckets[b] }));
 }
 
-const HistorySidebar = ({ isOpen, onClose, onSessionSelect, currentSessionId }) => {
+const HistorySidebar = ({ isOpen, onClose, onSessionSelect, currentSessionId, onNewChat }) => {
   const { user, token, isAuthenticated, login, logout } = useAuth();
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -152,6 +152,19 @@ const HistorySidebar = ({ isOpen, onClose, onSessionSelect, currentSessionId }) 
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h6a2 2 0 012 2v1" />
                   </svg>
+                </button>
+              </div>
+
+              {/* New Chat button */}
+              <div className="px-3 py-2 border-b border-white/10">
+                <button
+                  onClick={() => { onNewChat(); onClose(); }}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl border border-white/15 hover:bg-white/10 text-white/80 hover:text-white text-sm font-medium transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  New Chat
                 </button>
               </div>
 
