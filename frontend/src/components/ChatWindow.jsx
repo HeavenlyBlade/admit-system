@@ -18,6 +18,10 @@ const ChatWindow = ({ backButton }) => {
   const [sessionId, setSessionId] = useState(null);
   const [error, setError] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Privacy notice: shown once per browser session, dismissed on OK click
+  const [showPrivacyNotice, setShowPrivacyNotice] = useState(
+    () => !sessionStorage.getItem('admit_privacy_acknowledged')
+  );
   const messagesEndRef = useRef(null);
 
   const { user, token, refreshUser } = useAuth();
@@ -92,6 +96,11 @@ const ChatWindow = ({ backButton }) => {
     }
   };
 
+  const handleDismissPrivacy = () => {
+    sessionStorage.setItem('admit_privacy_acknowledged', '1');
+    setShowPrivacyNotice(false);
+  };
+
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -131,15 +140,41 @@ const ChatWindow = ({ backButton }) => {
       <div className="relative flex flex-col h-screen overflow-hidden">
 
         {/* Background Video */}
+        {/* TODO: compress bg-video.mp4 to <2MB using ffmpeg before production deployment */}
+        {/* Hidden on mobile to avoid downloading 12MB on limited-data connections */}
         <video
           autoPlay loop muted playsInline
-          className="absolute inset-0 w-full h-full object-cover z-0"
+          preload="none"
+          poster=""
+          className="absolute inset-0 w-full h-full object-cover z-0 hidden md:block"
         >
           <source src="/bg-video.mp4" type="video/mp4" />
         </video>
+        {/* Static fallback shown on mobile instead of the video */}
+        <div className="absolute inset-0 w-full h-full z-0 bg-gradient-to-br from-blue-950 via-slate-900 to-yellow-950 md:hidden" />
 
         {/* Dark overlay */}
         <div className="absolute inset-0 bg-black/60 z-10" />
+
+        {/* Privacy notice banner — RA 10173 compliance placeholder */}
+        {showPrivacyNotice && (
+          <div className="relative z-30 flex items-center justify-between gap-3 bg-yellow-900/80 backdrop-blur-sm border-b border-yellow-400/30 px-4 py-2 text-sm text-yellow-100">
+            <span>
+              Your conversation may be stored to improve this service.{' '}
+              <a href="/privacy" className="underline hover:text-yellow-300 focus:outline-none focus:ring-1 focus:ring-yellow-300 rounded">
+                See our Privacy Policy
+              </a>
+              .
+            </span>
+            <button
+              onClick={handleDismissPrivacy}
+              className="flex-shrink-0 px-3 py-1 rounded-lg bg-yellow-500/30 hover:bg-yellow-500/50 text-yellow-100 font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-yellow-400"
+              aria-label="Dismiss privacy notice"
+            >
+              OK
+            </button>
+          </div>
+        )}
 
         {/* Header */}
         <div className="relative z-20 backdrop-blur-md bg-black/30 border-b border-white/10 px-4 py-4">

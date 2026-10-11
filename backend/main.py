@@ -8,11 +8,18 @@ from contextlib import asynccontextmanager
 import logging
 import os
 
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
 from routers import chat, admin
 from routers.auth import router as auth_router
 from routers.sessions import router as sessions_router
 from services.embeddings import load_model
 from db.database import engine, init_db, Base
+
+# Rate limiter — keyed by client IP; shared with routers via app.state
+limiter = Limiter(key_func=get_remote_address)
 
 # Configure logging
 logging.basicConfig(
@@ -72,6 +79,10 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+# Attach rate limiter to app state and register the 429 handler
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Configure CORS
 app.add_middleware(

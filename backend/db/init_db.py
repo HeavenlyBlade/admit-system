@@ -18,15 +18,18 @@ async def create_indexes(conn):
     """Create indexes for performance optimization"""
     print("Creating indexes...")
     
-    # Pgvector index for embedding similarity search (ivfflat)
-    # Lists parameter set to 100 for KB size < 10K entries
+    # HNSW chosen over ivfflat: better recall at small KB sizes, no need to
+    # REINDEX after data changes. Drop the old ivfflat index if it exists.
     await conn.execute(text("""
-        CREATE INDEX IF NOT EXISTS idx_kb_embedding 
-        ON knowledge_base 
-        USING ivfflat (embedding vector_cosine_ops) 
-        WITH (lists = 100)
+        DROP INDEX IF EXISTS idx_kb_embedding
     """))
-    print("  ✓ Created pgvector index on knowledge_base.embedding")
+    await conn.execute(text("""
+        CREATE INDEX IF NOT EXISTS kb_embedding_hnsw_idx
+        ON knowledge_base
+        USING hnsw (embedding vector_cosine_ops)
+        WITH (m=16, ef_construction=64)
+    """))
+    print("  ✓ Created pgvector HNSW index on knowledge_base.embedding")
     
     # B-tree indexes for foreign keys and filtering
     await conn.execute(text("""

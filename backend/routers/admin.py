@@ -405,28 +405,48 @@ async def get_analytics(
     total_conversations_result = await db.execute(total_conversations_query)
     total_conversations = total_conversations_result.scalar() or 0
     
-    # Top unanswered queries
-    top_unanswered_query = select(
-        Message.content,
-        func.count(Message.id).label("count")
-    ).where(
-        and_(
-            Message.created_at >= start_date,
-            Message.created_at <= end_date,
-            Message.sender == "user",
-            Message.was_fallback == False
+    # Top unanswered queries: user messages in conversations that had at least one
+    # fallback bot response, grouped by content, ordered by frequency descending.
+    # Uses a subquery to find conversation IDs where a fallback bot message exists
+    # within the date range, then counts matching user messages.
+    fallback_conv_subquery = (
+        select(Message.conversation_id)
+        .where(
+            and_(
+                Message.created_at >= start_date,
+                Message.created_at <= end_date,
+                Message.sender == "bot",
+                Message.was_fallback == True,
+            )
         )
-    ).join(
-        Message,
-        and_(
-            Message.conversation_id == Message.conversation_id,
-            Message.sender == "bot",
-            Message.was_fallback == True
+        .distinct()
+        .subquery()
+    )
+
+    UserMsg = Message
+    top_unanswered_query = (
+        select(
+            UserMsg.content,
+            func.count(UserMsg.id).label("count"),
         )
-    ).group_by(Message.content).order_by(func.count(Message.id).desc()).limit(10)
-    
-    # Simplified: just get fallback user messages
-    top_unanswered = []
+        .where(
+            and_(
+                UserMsg.created_at >= start_date,
+                UserMsg.created_at <= end_date,
+                UserMsg.sender == "user",
+                UserMsg.conversation_id.in_(select(fallback_conv_subquery)),
+            )
+        )
+        .group_by(UserMsg.content)
+        .order_by(func.count(UserMsg.id).desc())
+        .limit(10)
+    )
+
+    top_unanswered_result = await db.execute(top_unanswered_query)
+    top_unanswered = [
+        TopUnansweredQuery(query=row.content, count=row.count)
+        for row in top_unanswered_result.all()
+    ]
     
     # KB coverage
     total_categories_result = await db.execute(select(func.count(KBCategory.id)))

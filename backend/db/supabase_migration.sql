@@ -55,7 +55,9 @@ CREATE TABLE IF NOT EXISTS messages (
 -- ─────────────────────────────
 -- Indexes
 -- ─────────────────────────────
-CREATE INDEX IF NOT EXISTS idx_kb_embedding   ON knowledge_base USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+-- HNSW chosen over ivfflat: better recall at small KB sizes, no need to REINDEX after data changes
+DROP INDEX IF EXISTS idx_kb_embedding;
+CREATE INDEX IF NOT EXISTS kb_embedding_hnsw_idx ON knowledge_base USING hnsw (embedding vector_cosine_ops) WITH (m=16, ef_construction=64);
 CREATE INDEX IF NOT EXISTS idx_kb_category    ON knowledge_base (category_id);
 CREATE INDEX IF NOT EXISTS idx_kb_active      ON knowledge_base (is_active);
 CREATE INDEX IF NOT EXISTS idx_conv_session   ON conversations (session_id);

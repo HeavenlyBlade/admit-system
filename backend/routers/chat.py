@@ -2,7 +2,7 @@
 Chat router for public-facing conversational AI endpoints.
 Orchestrates the full RAG pipeline: retrieval → generation → logging.
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Optional
@@ -16,14 +16,25 @@ from services.retrieval import retrieve_relevant_context
 from services.llm import generate_response, build_fallback_message
 from routers.auth import get_optional_user
 
+# RA 10173 compliance note: conversation logs are stored. Before production
+# deployment, add: (1) a privacy notice shown to users on first chat, (2) a
+# data retention policy (e.g. delete after 90 days), (3) user consent mechanism.
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["Chat"])
 
+# Import the shared limiter from main app state at request time (via Request).
+# slowapi resolves app.state.limiter automatically when the decorator is applied
+# to a route; we import it here for the decorator binding.
+from main import limiter
+
 
 @router.post("/chat", response_model=ChatResponse)
+@limiter.limit("20/minute")
 async def chat(
-    request: ChatRequest,
+    request: Request,
+    chat_request: ChatRequest,
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_user),
 ):
@@ -39,7 +50,7 @@ async def chat(
     """
     try:
         # 1. Session management
-        session_id = request.session_id or uuid.uuid4()
+        session_id = chat_request.session_id or uuid.uuid4()
         # Ensure session_id is always a uuid.UUID object so asyncpg gets the right type
         if isinstance(session_id, str):
             session_id = uuid.UUID(session_id)
@@ -67,34 +78,34 @@ async def chat(
         user_message = Message(
             conversation_id=conversation.id,
             sender="user",
-            content=request.message,
+            content=chat_request.message,
             matched_kb_ids=None,
             was_fallback=False
         )
         db.add(user_message)
         
         # 3. RAG Pipeline: Retrieval
-        logger.info(f"Processing query: '{request.message[:100]}...'")
+        logger.info(f"Processing query: '{chat_request.message[:100]}...'")
         matches, is_high_confidence = await retrieve_relevant_context(
-            db, request.message, top_k=5
+            db, chat_request.message, top_k=5
         )
         
         # 4. RAG Pipeline: Generation or Fallback
         if is_high_confidence and matches:
             # High confidence - generate LLM response
             try:
-                response_text = generate_response(matches, request.message)
+                response_text = generate_response(matches, chat_request.message)
                 matched_kb_ids = [match.id for match in matches]
                 was_fallback = False
                 logger.info("Generated LLM response")
             except Exception as e:
                 logger.error(f"LLM generation failed: {str(e)}, using fallback")
-                response_text = build_fallback_message(request.message)
+                response_text = build_fallback_message(chat_request.message)
                 matched_kb_ids = []
                 was_fallback = True
         else:
             # Low confidence - use fallback
-            response_text = build_fallback_message(request.message)
+            response_text = build_fallback_message(chat_request.message)
             matched_kb_ids = []
             was_fallback = True
             logger.info("Low confidence, using fallback response")
