@@ -64,18 +64,6 @@ async def get_optional_user(
         return None
 
 
-@router.get("/debug")
-async def auth_debug():
-    """Temporary debug endpoint — shows env var presence without exposing values."""
-    return {
-        "GOOGLE_CLIENT_ID_set": bool(GOOGLE_CLIENT_ID) and GOOGLE_CLIENT_ID != "your_google_client_id_here",
-        "GOOGLE_CLIENT_SECRET_set": bool(GOOGLE_CLIENT_SECRET) and GOOGLE_CLIENT_SECRET != "your_google_client_secret_here",
-        "FRONTEND_URL": FRONTEND_URL,
-        "BACKEND_URL": BACKEND_URL,
-        "GOOGLE_STATE_SECRET_len": len(GOOGLE_STATE_SECRET),
-        "GOOGLE_STATE_SECRET_is_placeholder": GOOGLE_STATE_SECRET == "changeme-state-secret",
-    }
-
 
 @router.get("/google")
 async def google_login():

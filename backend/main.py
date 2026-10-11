@@ -90,30 +90,6 @@ app.include_router(auth_router, prefix="/api/auth")
 app.include_router(sessions_router, prefix="/api")
 
 
-@app.post("/api/migrate")
-async def run_migration():
-    """Force-create all database tables and add any missing columns."""
-    from sqlalchemy import text
-    results = []
-    try:
-        async with engine.begin() as conn:
-            # Create extension and all tables
-            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-            await conn.run_sync(Base.metadata.create_all)
-            results.append("Tables created/verified")
-
-            # Add user_id column to conversations if missing
-            await conn.execute(text("""
-                ALTER TABLE conversations
-                ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE SET NULL
-            """))
-            results.append("conversations.user_id column ensured")
-
-        return {"status": "ok", "results": results}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-
 @app.get("/health")
 async def health_check():
     """Health check endpoint showing DB and service status."""
