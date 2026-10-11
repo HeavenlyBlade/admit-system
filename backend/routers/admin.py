@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_
 from sqlalchemy.orm import joinedload
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 
 from db.database import get_db
@@ -16,7 +16,7 @@ from models.pydantic_schemas import (
     AnalyticsResponse, TopUnansweredQuery
 )
 from models.schemas import KnowledgeBase, KBCategory, Conversation, Message, AdminUser
-from auth.jwt_handler import create_access_token, verify_password
+from auth.jwt_handler import create_access_token, verify_password, get_current_user
 from pydantic import BaseModel
 
 class AdminLoginRequest(BaseModel):
@@ -51,8 +51,8 @@ async def admin_login(
         )
 
     token = create_access_token({
-        "sub": str(admin.id),
-        "username": admin.username,
+        "sub": admin.username,
+        "user_id": admin.id,
         "role": admin.role,
     })
 
@@ -69,7 +69,8 @@ async def list_kb_entries(
     category_id: Optional[int] = None,
     is_active: Optional[bool] = None,
     search: Optional[str] = None,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_admin: dict = Depends(get_current_user)
 ):
     """
     List knowledge base entries with filtering and pagination.
@@ -128,7 +129,8 @@ async def list_kb_entries(
 @router.post("/kb", response_model=KBEntryResponse, status_code=status.HTTP_201_CREATED)
 async def create_kb_entry(
     request: KBEntryCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_admin: dict = Depends(get_current_user)
 ):
     """
     Create new knowledge base entry with automatic embedding generation.
@@ -145,7 +147,7 @@ async def create_kb_entry(
             content=request.content,
             embedding=embedding,
             is_active=request.is_active,
-            updated_by=1
+            updated_by=current_admin["user_id"]
         )
         
         db.add(kb_entry)
@@ -177,7 +179,8 @@ async def create_kb_entry(
 async def update_kb_entry(
     kb_id: int,
     request: KBEntryUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_admin: dict = Depends(get_current_user)
 ):
     """
     Update knowledge base entry with automatic embedding regeneration.
@@ -211,8 +214,8 @@ async def update_kb_entry(
         if request.is_active is not None:
             kb_entry.is_active = request.is_active
         
-        kb_entry.updated_by = 1
-        kb_entry.updated_at = datetime.utcnow()
+        kb_entry.updated_by = current_admin["user_id"]
+        kb_entry.updated_at = datetime.now(timezone.utc)
         
         await db.refresh(kb_entry, ["category"])
         await db.commit()
@@ -238,7 +241,8 @@ async def update_kb_entry(
 @router.delete("/kb/{kb_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_kb_entry(
     kb_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_admin: dict = Depends(get_current_user)
 ):
     """
     Soft delete knowledge base entry (set is_active = false).
@@ -255,8 +259,8 @@ async def delete_kb_entry(
         )
     
     kb_entry.is_active = False
-    kb_entry.updated_by = 1
-    kb_entry.updated_at = datetime.utcnow()
+    kb_entry.updated_by = current_admin["user_id"]
+    kb_entry.updated_at = datetime.now(timezone.utc)
     
     await db.commit()
     logger.info(f"Soft deleted KB entry ID: {kb_id}")
@@ -275,7 +279,8 @@ async def get_conversation_logs(
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
     fallback_only: Optional[bool] = None,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_admin: dict = Depends(get_current_user)
 ):
     """
     Retrieve conversation logs with filters.
@@ -345,7 +350,8 @@ async def get_conversation_logs(
 async def get_analytics(
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_admin: dict = Depends(get_current_user)
 ):
     """
     Compute analytics metrics.
@@ -358,7 +364,7 @@ async def get_analytics(
     """
     # Default date range: last 30 days
     if not end_date:
-        end_date = datetime.utcnow()
+        end_date = datetime.now(timezone.utc)
     
     if not start_date:
         start_date = end_date - timedelta(days=30)

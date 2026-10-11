@@ -6,7 +6,7 @@ import os
 import httpx
 import logging
 from urllib.parse import urlencode
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -153,7 +153,7 @@ async def google_callback(
     if user:
         user.name = name
         user.avatar_url = avatar_url
-        user.last_login = datetime.utcnow()
+        user.last_login = datetime.now(timezone.utc)
     else:
         user = User(
             google_id=google_id,
