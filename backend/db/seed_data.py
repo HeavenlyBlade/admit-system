@@ -12,10 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sqlalchemy import select
 from db.database import get_db_context
 from models.schemas import KBCategory, AdminUser
-from passlib.context import CryptContext
-
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+from auth.jwt_handler import hash_password
 
 
 async def seed_categories():
@@ -99,7 +96,7 @@ async def seed_admin_user():
             return
         
         # Hash password and create admin user
-        password_hash = pwd_context.hash(password)
+        password_hash = hash_password(password)
         admin_user = AdminUser(
             username=username,
             password_hash=password_hash,
