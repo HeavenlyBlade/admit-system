@@ -8,6 +8,7 @@ from sqlalchemy import select
 from typing import Optional
 import uuid
 import logging
+import os
 
 from db.database import get_db
 from models.pydantic_schemas import ChatRequest, ChatResponse, QuickReply
@@ -134,13 +135,14 @@ async def chat(
     except Exception as e:
         logger.error(f"Chat endpoint error: {str(e)}")
         await db.rollback()
+        _is_prod = os.environ.get("ENVIRONMENT") == "production"
         raise HTTPException(
             status_code=500,
             detail={
                 "error": {
                     "code": "CHAT_ERROR",
                     "message": "An error occurred processing your message",
-                    "details": str(e)
+                    **({"details": str(e)} if not _is_prod else {}),
                 }
             }
         )

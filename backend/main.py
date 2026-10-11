@@ -2,7 +2,7 @@
 ADMIT - Main FastAPI application entry point.
 Conversational AI System for Admissions & Enrollment Assistance.
 """
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
@@ -30,6 +30,11 @@ logger = logging.getLogger(__name__)
 
 # CORS origins from environment
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
+
+# C21 — Gate /docs and /redoc in production
+_is_production = os.environ.get("ENVIRONMENT") == "production"
+docs_url = None if _is_production else "/docs"
+redoc_url = None if _is_production else "/redoc"
 
 
 @asynccontextmanager
@@ -76,13 +81,23 @@ app = FastAPI(
     description="Conversational AI System for SACLI Admissions & Enrollment Assistance",
     version="1.0.0",
     lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc"
+    docs_url=docs_url,
+    redoc_url=redoc_url,
 )
 
 # Attach rate limiter to app state and register the 429 handler
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# C23 — Basic security headers middleware
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next) -> Response:
+    """Add standard security headers to every response."""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    return response
 
 # Configure CORS
 app.add_middleware(

@@ -56,7 +56,10 @@ async def get_db() -> AsyncSession:
     async with AsyncSessionLocal() as session:
         try:
             yield session
-            await session.commit()
+            # Only commit if the session has pending changes (new, dirty, or deleted
+            # objects). Read-only requests (GET endpoints) exit cleanly with no commit.
+            if session.new or session.dirty or session.deleted:
+                await session.commit()
         except Exception:
             await session.rollback()
             raise

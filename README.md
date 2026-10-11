@@ -8,7 +8,7 @@ ADMIT (Admissions & Inquiries Technology) is a web-based conversational AI assis
 - **Backend**: FastAPI (Python)
 - **Database**: PostgreSQL with pgvector extension
 - **LLM**: Groq API (Llama 3.1)
-- **Embeddings**: sentence-transformers (all-MiniLM-L6-v2)
+- **Embeddings**: fastembed (BAAI/bge-small-en-v1.5)
 
 ## Features
 

@@ -8,6 +8,7 @@ from sqlalchemy.orm import joinedload
 from typing import Optional
 from datetime import datetime, timedelta, timezone
 import logging
+import os
 
 from db.database import get_db
 from models.pydantic_schemas import (
@@ -163,13 +164,14 @@ async def create_kb_entry(
     except Exception as e:
         logger.error(f"Error creating KB entry: {str(e)}")
         await db.rollback()
+        _is_prod = os.environ.get("ENVIRONMENT") == "production"
         raise HTTPException(
             status_code=500,
             detail={
                 "error": {
                     "code": "KB_CREATE_ERROR",
                     "message": "Failed to create knowledge base entry",
-                    "details": str(e)
+                    **({"details": str(e)} if not _is_prod else {}),
                 }
             }
         )
@@ -226,13 +228,14 @@ async def update_kb_entry(
     except Exception as e:
         logger.error(f"Error updating KB entry: {str(e)}")
         await db.rollback()
+        _is_prod = os.environ.get("ENVIRONMENT") == "production"
         raise HTTPException(
             status_code=500,
             detail={
                 "error": {
                     "code": "KB_UPDATE_ERROR",
                     "message": "Failed to update knowledge base entry",
-                    "details": str(e)
+                    **({"details": str(e)} if not _is_prod else {}),
                 }
             }
         )

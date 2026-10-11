@@ -28,12 +28,13 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run tests
-        run: pytest --tb=short || true   # non-blocking until tests are added
+        run: pytest backend/tests/ --tb=short -q
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           CONFIDENCE_THRESHOLD: '0.35'
+          ENVIRONMENT: test
 
   # ─────────────────────────────────────────
   # Frontend Build
