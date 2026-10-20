@@ -4,7 +4,10 @@
  */
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_API_BASE_URL ||
+  'http://localhost:8000';
 
 // Create axios instance with base configuration
 const apiClient = axios.create({
@@ -19,20 +22,26 @@ const apiClient = axios.create({
  * Send message to chat endpoint
  * @param {string} message - User message
  * @param {string|null} sessionId - Optional session ID for conversation tracking
+ * @param {string|null} token - Optional JWT for authenticated requests
  * @returns {Promise<Object>} Chat response with bot message and metadata
  */
-export const sendMessage = async (message, sessionId = null) => {
+export const sendMessage = async (message, sessionId = null, token = null) => {
   try {
-    const response = await apiClient.post('/api/chat', {
-      message,
-      session_id: sessionId,
-    });
+    const headers = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    const response = await apiClient.post(
+      '/api/chat',
+      { message, session_id: sessionId },
+      { headers }
+    );
     return response.data;
   } catch (error) {
     console.error('Error sending message:', error);
     throw new Error(
-      error.response?.data?.detail?.error?.message || 
-      'Failed to send message. Please try again.'
+      error.response?.data?.detail?.error?.message ||
+        'Failed to send message. Please try again.'
     );
   }
 };
