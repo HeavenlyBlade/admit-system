@@ -116,7 +116,48 @@ app.include_router(auth_router, prefix="/api/auth")
 app.include_router(sessions_router, prefix="/api")
 
 
-@app.get("/health")
+@app.get("/debug/retrieval")
+async def debug_retrieval():
+    """Debug endpoint — test embedding + vector search end to end. Remove before final production."""
+    from services.embeddings import load_model, embed, _model
+    from sqlalchemy import text as sql_text
+
+    result = {"embedding_model_loaded": _model is not None}
+
+    # Step 1: embed
+    try:
+        load_model()
+        emb = embed("What programs does SACLI offer?")
+        result["embed_ok"] = True
+        result["embed_dim"] = len(emb)
+    except Exception as e:
+        result["embed_ok"] = False
+        result["embed_error"] = str(e)
+        return result
+
+    # Step 2: raw vector search
+    try:
+        emb_str = "[" + ",".join(map(str, emb)) + "]"
+        async with engine.connect() as conn:
+            r = await conn.execute(sql_text("""
+                SELECT id, title,
+                       1 - (embedding <=> CAST(:emb AS vector)) AS similarity
+                FROM knowledge_base
+                WHERE is_active = true
+                ORDER BY embedding <=> CAST(:emb AS vector)
+                LIMIT 5
+            """), {"emb": emb_str})
+            rows = r.fetchall()
+            result["search_ok"] = True
+            result["matches"] = [
+                {"id": row[0], "title": row[1], "similarity": float(row[2])}
+                for row in rows
+            ]
+    except Exception as e:
+        result["search_ok"] = False
+        result["search_error"] = str(e)
+
+    return result
 async def health_check():
     """Health check endpoint showing DB and service status."""
     from sqlalchemy import text as sql_text
