@@ -147,6 +147,42 @@ def generate_response(matches: List[KBMatch], query: str) -> str:
         raise RuntimeError(f"LLM generation failed: {str(e)}")
 
 
+def generate_response_streaming(matches: List[KBMatch], query: str):
+    """
+    Generate a streaming response using Groq's streaming mode.
+
+    Yields incremental text tokens (str) as they arrive from the model so the
+    caller can forward them immediately (e.g. over Server-Sent Events).
+
+    Note: Post-hoc validation is intentionally skipped here because the text is
+    already being shown to the user as it streams; validating after the fact
+    would require retracting visible content.
+    """
+    client = get_groq_client()
+    prompt = build_prompt(matches, query)
+
+    try:
+        logger.info(f"Calling Groq API (streaming, model: {MODEL_NAME})")
+        completion = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=TEMPERATURE,
+            max_tokens=MAX_TOKENS,
+            top_p=0.9,
+            stop=["\n\nQuestion:", "\n\nCONTEXT:"],
+            stream=True,
+        )
+
+        for chunk in completion:
+            if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+
+        logger.info("Streaming response completed")
+    except Exception as e:
+        logger.error(f"Groq streaming API error: {str(e)}")
+        raise RuntimeError(f"LLM streaming generation failed: {str(e)}")
+
+
 def build_fallback_message(query: str) -> str:
     """
     Build fallback message for out-of-scope queries.

@@ -3,8 +3,8 @@ Admin router for knowledge base management and analytics.
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_
-from sqlalchemy.orm import joinedload
+from sqlalchemy import select, func, and_, or_, exists
+from sqlalchemy.orm import joinedload, aliased
 from typing import Optional
 from datetime import datetime, timedelta, timezone
 import logging
@@ -408,25 +408,15 @@ async def get_analytics(
     total_conversations_result = await db.execute(total_conversations_query)
     total_conversations = total_conversations_result.scalar() or 0
     
-    # Top unanswered queries: user messages in conversations that had at least one
-    # fallback bot response, grouped by content, ordered by frequency descending.
-    # Uses a subquery to find conversation IDs where a fallback bot message exists
-    # within the date range, then counts matching user messages.
-    fallback_conv_subquery = (
-        select(Message.conversation_id)
-        .where(
-            and_(
-                Message.created_at >= start_date,
-                Message.created_at <= end_date,
-                Message.sender == "bot",
-                Message.was_fallback == True,
-            )
-        )
-        .distinct()
-        .subquery()
-    )
+    # Top unanswered queries: user messages whose immediately following bot
+    # message (same conversation, created within 10 seconds after the user
+    # message) was a fallback response. Grouped by content, ordered by
+    # frequency descending, limited to the top 10.
+    # Using correlated EXISTS so only the user message that actually triggered
+    # a fallback is counted (not every user message in a fallback conversation).
+    UserMsg = aliased(Message)
+    BotMsg = aliased(Message)
 
-    UserMsg = Message
     top_unanswered_query = (
         select(
             UserMsg.content,
@@ -434,10 +424,18 @@ async def get_analytics(
         )
         .where(
             and_(
+                UserMsg.sender == "user",
                 UserMsg.created_at >= start_date,
                 UserMsg.created_at <= end_date,
-                UserMsg.sender == "user",
-                UserMsg.conversation_id.in_(select(fallback_conv_subquery)),
+                exists().where(
+                    and_(
+                        BotMsg.conversation_id == UserMsg.conversation_id,
+                        BotMsg.sender == "bot",
+                        BotMsg.was_fallback == True,  # noqa: E712
+                        BotMsg.created_at >= UserMsg.created_at,
+                        BotMsg.created_at <= UserMsg.created_at + timedelta(seconds=10),
+                    )
+                ),
             )
         )
         .group_by(UserMsg.content)

@@ -24,6 +24,7 @@ class ChatResponse(BaseModel):
     session_id: UUID = Field(..., description="Session ID for this conversation")
     was_fallback: bool = Field(..., description="True if response was fallback redirect")
     matched_kb_ids: List[int] = Field(default_factory=list, description="KB entry IDs used in response")
+    matched_kb_titles: List[str] = Field(default_factory=list, description="Human-readable KB titles used in response")
 
 
 class QuickReply(BaseModel):

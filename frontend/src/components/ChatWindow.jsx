@@ -7,7 +7,7 @@ import MessageBubble from './MessageBubble';
 import TypingIndicator from './TypingIndicator';
 import QuickReplyButtons from './QuickReplyButtons';
 import HistorySidebar from './HistorySidebar';
-import { sendMessage } from '../api/chatApi';
+import { sendMessage, sendMessageStream } from '../api/chatApi';
 import { getSession } from '../api/sessionsApi';
 import { useAuth } from '../context/AuthContext';
 
@@ -18,6 +18,9 @@ const ChatWindow = ({ backButton }) => {
   const [sessionId, setSessionId] = useState(null);
   const [error, setError] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Stream responses token-by-token via SSE; can be toggled off to use the
+  // regular (non-streaming) /api/chat endpoint.
+  const [useStreaming, setUseStreaming] = useState(true);
   // Privacy notice: shown once per browser session, dismissed on OK click
   const [showPrivacyNotice, setShowPrivacyNotice] = useState(
     () => !sessionStorage.getItem('admit_privacy_acknowledged')
@@ -67,6 +70,86 @@ const ChatWindow = ({ backButton }) => {
     setError(null);
     setIsLoading(true);
 
+    if (useStreaming) {
+      // Streaming path: typing indicator stays up until the first token
+      // arrives, then a bot bubble is created and grown token-by-token.
+      let botId = null;
+      let firstToken = true;
+
+      try {
+        await sendMessageStream(messageText, sessionId, token,
+          (tokenText) => {
+            if (firstToken) {
+              firstToken = false;
+              botId = Date.now() + 1;
+              setIsLoading(false);
+              setMessages((prev) => [...prev, {
+                id: botId,
+                sender: 'bot',
+                content: tokenText,
+                timestamp: new Date(),
+                streaming: true,
+              }]);
+            } else if (botId) {
+              setMessages((prev) => prev.map((m) =>
+                m.id === botId ? { ...m, content: m.content + tokenText } : m
+              ));
+            }
+          },
+          (doneMeta) => {
+            // Ensure a bubble exists even if no tokens arrived.
+            if (!botId) {
+              botId = Date.now() + 1;
+              setMessages((prev) => [...prev, {
+                id: botId,
+                sender: 'bot',
+                content: '',
+                timestamp: new Date(),
+              }]);
+            }
+            setMessages((prev) => prev.map((m) =>
+              m.id === botId
+                ? {
+                    ...m,
+                    streaming: false,
+                    wasFallback: doneMeta.was_fallback,
+                    matchedKbIds: doneMeta.matched_kb_ids,
+                    sources: doneMeta.matched_kb_titles || [],
+                  }
+                : m
+            ));
+            if (doneMeta.session_id && doneMeta.session_id !== sessionId) {
+              setSessionId(doneMeta.session_id);
+              localStorage.setItem('admit_session_id', doneMeta.session_id);
+            }
+          }
+        );
+      } catch (streamErr) {
+        if (botId) {
+          // Tokens already streamed before the failure: finalize the partial
+          // bubble with an interruption note instead of duplicating the reply.
+          setMessages((prev) => prev.map((m) =>
+            m.id === botId
+              ? { ...m, streaming: false, content: m.content + '\n\n⚠️ Response interrupted. Please try again.' }
+              : m
+          ));
+        } else {
+          // Nothing streamed yet: fall back to the non-streaming endpoint.
+          await sendViaRegularEndpoint(messageText);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    // Non-streaming path
+    await sendViaRegularEndpoint(messageText);
+  };
+
+  // Helper: send a message through the non-streaming /api/chat endpoint and
+  // append the bot response (also used as a streaming failure fallback).
+  const sendViaRegularEndpoint = async (messageText) => {
     try {
       const response = await sendMessage(messageText, sessionId, token);
       if (response.session_id && response.session_id !== sessionId) {
@@ -80,6 +163,7 @@ const ChatWindow = ({ backButton }) => {
         timestamp: new Date(),
         wasFallback: response.was_fallback,
         matchedKbIds: response.matched_kb_ids,
+        sources: response.matched_kb_titles || [],
       };
       setMessages((prev) => [...prev, botMessage]);
     } catch (err) {
@@ -256,7 +340,12 @@ const ChatWindow = ({ backButton }) => {
             )}
 
             {messages.map((message) => (
-              <MessageBubble key={message.id} message={message} user={message.sender === 'user' ? user : null} />
+              <MessageBubble
+                key={message.id}
+                message={message}
+                user={message.sender === 'user' ? user : null}
+                sources={message.sources}
+              />
             ))}
 
             {isLoading && <TypingIndicator />}
@@ -300,8 +389,24 @@ const ChatWindow = ({ backButton }) => {
                 {isLoading ? '...' : 'Send'}
               </button>
             </div>
-            <div className="mt-1 text-xs text-white/30 text-right">
-              {inputText.length}/500
+            <div className="flex items-center justify-between mt-1">
+              {/* Streaming toggle */}
+              <button
+                type="button"
+                onClick={() => setUseStreaming((v) => !v)}
+                className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
+                  useStreaming
+                    ? 'bg-yellow-500/20 text-yellow-300 border-yellow-400/40'
+                    : 'text-white/40 border-white/10 hover:text-white/60'
+                }`}
+                aria-pressed={useStreaming}
+                title="Toggle streaming responses (word-by-word typing)"
+              >
+                ⚡ Streaming {useStreaming ? 'on' : 'off'}
+              </button>
+              <div className="text-xs text-white/30 text-right">
+                {inputText.length}/500
+              </div>
             </div>
           </div>
         </div>

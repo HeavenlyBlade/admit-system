@@ -3,18 +3,20 @@ Chat router for public-facing conversational AI endpoints.
 Orchestrates the full RAG pipeline: retrieval → generation → logging.
 """
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Optional
 import uuid
 import logging
 import os
+import json
 
-from db.database import get_db
+from db.database import get_db, get_db_context
 from models.pydantic_schemas import ChatRequest, ChatResponse, QuickReply
 from models.schemas import Conversation, Message, User
 from services.retrieval import retrieve_relevant_context
-from services.llm import generate_response, build_fallback_message
+from services.llm import generate_response, generate_response_streaming, build_fallback_message
 from routers.auth import get_optional_user
 
 # RA 10173 compliance note: conversation logs are stored. Before production
@@ -29,6 +31,11 @@ router = APIRouter(prefix="/api", tags=["Chat"])
 # slowapi resolves app.state.limiter automatically when the decorator is applied
 # to a route; we import it here for the decorator binding.
 from main import limiter
+
+
+def _sse_event(payload: dict) -> bytes:
+    """Serialize a payload dict as a single Server-Sent Events data frame."""
+    return f"data: {json.dumps(payload)}\n\n".encode("utf-8")
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -97,17 +104,20 @@ async def chat(
             try:
                 response_text = generate_response(matches, chat_request.message)
                 matched_kb_ids = [match.id for match in matches]
+                matched_kb_titles = [match.title for match in matches]
                 was_fallback = False
                 logger.info("Generated LLM response")
             except Exception as e:
                 logger.error(f"LLM generation failed: {str(e)}, using fallback")
                 response_text = build_fallback_message(chat_request.message)
                 matched_kb_ids = []
+                matched_kb_titles = []
                 was_fallback = True
         else:
             # Low confidence - use fallback
             response_text = build_fallback_message(chat_request.message)
             matched_kb_ids = []
+            matched_kb_titles = []
             was_fallback = True
             logger.info("Low confidence, using fallback response")
         
@@ -129,7 +139,8 @@ async def chat(
             response=response_text,
             session_id=session_id,
             was_fallback=was_fallback,
-            matched_kb_ids=matched_kb_ids
+            matched_kb_ids=matched_kb_ids,
+            matched_kb_titles=matched_kb_titles,
         )
         
     except Exception as e:
@@ -146,6 +157,163 @@ async def chat(
                 }
             }
         )
+
+
+@router.post("/chat/stream")
+@limiter.limit("20/minute")
+async def chat_stream(
+    request: Request,
+    chat_request: ChatRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
+):
+    """
+    Streaming chat endpoint - same RAG pipeline as /api/chat, but streams the
+    bot response to the client token-by-token over Server-Sent Events (SSE).
+
+    Event format:
+      - data: {"token": "..."}       (repeated, one per streamed chunk)
+      - data: {"done": true, "session_id": "...", "was_fallback": bool,
+               "matched_kb_ids": [...], "matched_kb_titles": [...]}  (terminal)
+      - data: {"error": "..."}        (on failure)
+
+    Conversation + message logging still happens: the user message is committed
+    before streaming starts, and the complete bot message is logged after the
+    stream finishes.
+    """
+    # --- Pre-streaming setup (runs with the request-scoped DB session) ---
+    try:
+        # 1. Session management
+        session_id = chat_request.session_id or uuid.uuid4()
+        if isinstance(session_id, str):
+            session_id = uuid.UUID(session_id)
+
+        result = await db.execute(
+            select(Conversation).where(Conversation.session_id == session_id)
+        )
+        conversation = result.scalars().first()
+
+        if not conversation:
+            conversation = Conversation(
+                session_id=session_id,
+                user_id=current_user.id if current_user else None,
+            )
+            db.add(conversation)
+            await db.flush()
+        elif current_user and conversation.user_id is None:
+            conversation.user_id = current_user.id
+
+        # 2. Log the user message BEFORE streaming starts
+        user_message = Message(
+            conversation_id=conversation.id,
+            sender="user",
+            content=chat_request.message,
+            matched_kb_ids=None,
+            was_fallback=False,
+        )
+        db.add(user_message)
+
+        # 3. RAG Pipeline: Retrieval
+        matches, is_high_confidence = await retrieve_relevant_context(
+            db, chat_request.message, top_k=5
+        )
+
+        # 4. Decide fallback vs. streaming generation
+        if is_high_confidence and matches:
+            matched_kb_ids = [match.id for match in matches]
+            matched_kb_titles = [match.title for match in matches]
+            was_fallback = False
+            response_text = None  # will be produced by the stream
+        else:
+            response_text = build_fallback_message(chat_request.message)
+            matched_kb_ids = []
+            matched_kb_titles = []
+            was_fallback = True
+            # Fallback is static - log the bot message now, before streaming
+            db.add(
+                Message(
+                    conversation_id=conversation.id,
+                    sender="bot",
+                    content=response_text,
+                    matched_kb_ids=[],
+                    was_fallback=True,
+                )
+            )
+
+        # Commit user message (and fallback bot message if applicable)
+        await db.commit()
+        conversation_id = conversation.id
+    except Exception as e:
+        logger.error(f"Chat stream setup error: {str(e)}")
+        await db.rollback()
+        _is_prod = os.environ.get("ENVIRONMENT") == "production"
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": {
+                    "code": "CHAT_ERROR",
+                    "message": "An error occurred processing your message",
+                    **({"details": str(e)} if not _is_prod else {}),
+                }
+            }
+        )
+
+    # Capture primitives for the generator (avoids relying on the
+    # request-scoped session staying open while the stream runs).
+    query_text = chat_request.message
+    fallback_text = response_text
+    stream_matches = matches
+
+    # --- SSE generator ---
+    async def event_stream():
+        try:
+            if was_fallback:
+                # Static fallback: send the whole message in one event
+                yield _sse_event({"token": fallback_text})
+                yield _sse_event({
+                    "done": True,
+                    "session_id": str(session_id),
+                    "was_fallback": True,
+                    "matched_kb_ids": [],
+                    "matched_kb_titles": [],
+                })
+            else:
+                full_text = ""
+                for token in generate_response_streaming(stream_matches, query_text):
+                    full_text += token
+                    yield _sse_event({"token": token})
+
+                # Log the complete bot message after streaming finishes
+                try:
+                    async with get_db_context() as log_db:
+                        log_db.add(
+                            Message(
+                                conversation_id=conversation_id,
+                                sender="bot",
+                                content=full_text,
+                                matched_kb_ids=matched_kb_ids,
+                                was_fallback=False,
+                            )
+                        )
+                except Exception as log_err:
+                    logger.error(f"Failed to log streaming bot message: {log_err}")
+
+                yield _sse_event({
+                    "done": True,
+                    "session_id": str(session_id),
+                    "was_fallback": False,
+                    "matched_kb_ids": matched_kb_ids,
+                    "matched_kb_titles": matched_kb_titles,
+                })
+        except Exception as e:
+            logger.error(f"Streaming response error: {str(e)}")
+            yield _sse_event({"error": "Streaming response failed"})
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get("/quick-replies", response_model=list[QuickReply])

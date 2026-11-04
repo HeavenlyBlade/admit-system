@@ -56,24 +56,30 @@ async def seed_categories():
         {"name": "About SACLI", "department": "GENERAL"},
         {"name": "Campus Facilities", "department": "GENERAL"},
         {"name": "Student Services", "department": "GENERAL"},
+        {"name": "Contact Information", "department": "GENERAL"},
+        {"name": "Scholarships", "department": "GENERAL"},
+        {"name": "Tuition and Payment", "department": "GENERAL"},
     ]
     
     async with get_db_context() as db:
-        # Check if categories already exist
+        # Load existing categories to avoid duplicates
         result = await db.execute(select(KBCategory))
-        existing = result.scalars().first()
-        
-        if existing:
+        existing_cats = result.scalars().all()
+        existing_set = {(c.name, c.department) for c in existing_cats}
+
+        new_cats = [c for c in categories if (c["name"], c["department"]) not in existing_set]
+
+        if not new_cats:
             print("  ⚠ Categories already exist, skipping...")
             return
         
-        # Insert categories
-        for cat_data in categories:
+        # Insert only missing categories
+        for cat_data in new_cats:
             category = KBCategory(**cat_data)
             db.add(category)
         
         await db.commit()
-        print(f"  ✓ Created {len(categories)} KB categories")
+        print(f"  ✓ Created {len(new_cats)} KB categories")
 
 
 async def seed_admin_user():
@@ -625,16 +631,16 @@ async def seed_sample_kb_entries():
         all_categories = result.scalars().all()
         cat_lookup = {(c.name, c.department): c.id for c in all_categories}
 
-        # Check how many KB entries already exist
-        kb_result = await db.execute(sa_select(KnowledgeBase))
-        existing_count = len(kb_result.scalars().all())
-        if existing_count > 0:
-            print(f"  ⚠ {existing_count} KB entries already exist, skipping...")
-            return
+        # Check for existing KB entry titles to avoid duplicates
+        kb_result = await db.execute(sa_select(KnowledgeBase.title))
+        existing_titles = {row[0] for row in kb_result.fetchall()}
 
         inserted = 0
         skipped = 0
         for (cat_name, dept, title, content) in kb_entries_raw:
+            if title in existing_titles:
+                skipped += 1
+                continue
             cat_id = cat_lookup.get((cat_name, dept))
             if cat_id is None:
                 print(f"  ⚠ Category not found: ({cat_name}, {dept}) — skipping '{title}'")
