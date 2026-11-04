@@ -32,8 +32,10 @@ def load_model() -> TextEmbedding:
 
 
 def get_model() -> TextEmbedding:
+    """Get the model, loading it lazily if startup load failed."""
     if _model is None:
-        raise RuntimeError("Model not loaded. Call load_model() first.")
+        logger.warning("Model not loaded at startup — loading now (lazy init).")
+        return load_model()
     return _model
 
 

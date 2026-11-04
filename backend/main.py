@@ -120,31 +120,38 @@ app.include_router(sessions_router, prefix="/api")
 async def health_check():
     """Health check endpoint showing DB and service status."""
     from sqlalchemy import text as sql_text
-    from sqlalchemy import inspect
+    from services.embeddings import _model
     db_status = "unknown"
     db_error = None
     tables = []
     admin_count = 0
+    kb_count = 0
 
     try:
         async with engine.connect() as conn:
             await conn.execute(sql_text("SELECT 1"))
             db_status = "connected"
 
-            # Check if tables exist
             result = await conn.execute(sql_text(
                 "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
             ))
             tables = [row[0] for row in result.fetchall()]
 
-            # Check admin user count
             if "admin_users" in tables:
                 result = await conn.execute(sql_text("SELECT COUNT(*) FROM admin_users"))
                 admin_count = result.scalar()
 
+            if "knowledge_base" in tables:
+                result = await conn.execute(sql_text(
+                    "SELECT COUNT(*) FROM knowledge_base WHERE is_active = true AND embedding IS NOT NULL"
+                ))
+                kb_count = result.scalar()
+
     except Exception as e:
         db_status = "error"
         db_error = str(e)
+
+    embedding_model_loaded = _model is not None
 
     return {
         "status": "healthy" if db_status == "connected" else "degraded",
@@ -154,6 +161,8 @@ async def health_check():
         "database_error": db_error,
         "tables": tables,
         "admin_users_count": admin_count,
+        "kb_entries_active": kb_count,
+        "embedding_model_loaded": embedding_model_loaded,
     }
 
 
