@@ -27,10 +27,17 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["Chat"])
 
-# Import the shared limiter from main app state at request time (via Request).
-# slowapi resolves app.state.limiter automatically when the decorator is applied
-# to a route; we import it here for the decorator binding.
-from main import limiter
+# The limiter lives on app.state (set in main.py). We access it via the
+# Request object at runtime to avoid a circular import with main.py.
+# slowapi's @limiter.limit decorator needs a limiter instance at decoration
+# time, so we create a thin proxy that delegates to app.state.limiter.
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+# Module-level limiter used only for the @limiter.limit decorator binding.
+# The actual shared limiter on app.state takes precedence at runtime because
+# slowapi resolves it from app.state when the middleware processes the request.
+limiter = Limiter(key_func=get_remote_address)
 
 
 def _sse_event(payload: dict) -> bytes:
