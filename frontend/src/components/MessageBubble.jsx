@@ -4,6 +4,8 @@
  * Accepts optional `sources` prop (array of KB title strings) shown for bot
  * messages that were generated from retrieved knowledge base entries.
  */
+import ReactMarkdown from 'react-markdown';
+
 const MessageBubble = ({ message, user, sources }) => {
   const isUser = message.sender === 'user';
   const isError = message.isError;
@@ -25,9 +27,21 @@ const MessageBubble = ({ message, user, sources }) => {
             : 'bg-white/15 backdrop-blur text-white border border-white/20 rounded-bl-none'
         }`}
       >
-        <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">
-          {message.content}
-        </div>
+        {isUser ? (
+          /* User messages: plain text, no markdown needed */
+          <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+            {message.content}
+          </div>
+        ) : (
+          /* Bot messages: render markdown so **bold**, bullets, links display correctly */
+          <div className="prose prose-sm prose-invert max-w-none text-sm leading-relaxed
+                          prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5
+                          prose-strong:text-white prose-a:text-yellow-300 prose-a:underline
+                          prose-headings:text-white prose-code:text-yellow-200
+                          prose-blockquote:border-l-yellow-400 prose-blockquote:text-white/70">
+            <ReactMarkdown>{message.content}</ReactMarkdown>
+          </div>
+        )}
 
         {/* Sources — only for grounded bot responses */}
         {messageSources.length > 0 && (
