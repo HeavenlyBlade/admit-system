@@ -30,7 +30,7 @@ def get_groq_client():
     return _groq_client
 
 # LLM parameters
-MODEL_NAME = "llama-3.1-8b-instant"  # Fast, good quality
+MODEL_NAME = "openai/gpt-oss-20b"  # 1000 t/s, free tier, replaced llama-3.1-8b-instant
 TEMPERATURE = 0.3  # Low for factual consistency
 MAX_TOKENS = 256
 
