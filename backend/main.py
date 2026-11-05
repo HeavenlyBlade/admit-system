@@ -158,6 +158,9 @@ async def debug_retrieval():
         result["search_error"] = str(e)
 
     return result
+
+
+@app.get("/health")
 async def health_check():
     """Health check endpoint showing DB and service status."""
     from sqlalchemy import text as sql_text
