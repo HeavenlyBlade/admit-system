@@ -1,130 +1,211 @@
-# ADMIT Deployment Guide
+# ADMIT — Deployment Guide
 
-## Overview
-- **Frontend** → Vercel (free tier)
-- **Backend** → Render (free tier)
-- **Database** → Supabase (free tier, PostgreSQL + pgvector)
-- **LLM** → Groq API (free tier)
-- **Source Control** → GitHub
+ADMIT is deployed across three free-tier services:
+
+| Service | Platform | URL |
+|---|---|---|
+| Frontend | Vercel | https://admit-system.vercel.app |
+| Backend | Render | https://admit-backend.onrender.com |
+| Database | Supabase | PostgreSQL + pgvector |
 
 ---
 
-## Step 1 — Push to GitHub
+## Current Deployment State
 
+The system is already deployed. This guide covers:
+- How the services are connected
+- How to trigger redeployments
+- How to update environment variables
+- What to do if a service goes down
+
+---
+
+## Architecture
+
+```
+Browser → Vercel (React SPA)
+              ↓ HTTPS REST
+         Render (FastAPI)
+              ↓ asyncpg + SSL
+         Supabase (PostgreSQL + pgvector)
+              ↓
+         Groq API (LLM generation)
+```
+
+---
+
+## Frontend — Vercel
+
+### Auto-deploy
+Vercel is connected to the GitHub repo and auto-deploys on every push to `main`. No manual action needed.
+
+### Manual redeploy
+1. Go to https://vercel.com → your project → **Deployments**
+2. Click the latest deployment → **Redeploy**
+
+### Environment variables (Vercel dashboard)
+| Variable | Value |
+|---|---|
+| `VITE_API_BASE_URL` | `https://admit-backend.onrender.com` |
+
+To update: Vercel Dashboard → Project → **Settings → Environment Variables**
+
+### Build settings
+- Root directory: `frontend`
+- Build command: `npm run build`
+- Output directory: `dist`
+- Framework: Vite
+
+---
+
+## Backend — Render
+
+### Auto-deploy
+Render is connected to the GitHub repo (`backend/` subdirectory) and auto-deploys on push to `main`.
+
+> ⚠️ If auto-deploy is not triggering, go to Render Dashboard → `admit-backend` → **Manual Deploy → Deploy latest commit**
+
+### Environment variables (Render dashboard)
+Go to Render → `admit-backend` → **Environment**
+
+| Variable | Value |
+|---|---|
+| `DATABASE_URL` | Supabase pooler URL (`postgresql+asyncpg://...pooler.supabase.com...`) |
+| `GROQ_API_KEY` | Your Groq API key |
+| `JWT_SECRET` | 64-char hex string |
+| `JWT_EXPIRATION_HOURS` | `24` |
+| `CONFIDENCE_THRESHOLD` | `0.35` |
+| `ALLOWED_ORIGINS` | `https://admit-system.vercel.app,http://localhost:5173` |
+
+After saving, Render triggers an automatic redeploy.
+
+### Service settings
+- Root directory: `backend`
+- Build command: `pip install -r requirements.txt`
+- Start command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+- Runtime: Python 3.11
+
+### Free tier behavior
+- Render spins down after **15 minutes of inactivity** → first request after sleep takes ~30s
+- The GitHub Actions keepalive (`.github/workflows/keepalive.yml`) pings `/health` every 3 days, which is enough to prevent Supabase from pausing but NOT enough to keep Render warm 24/7
+- For always-on performance, upgrade Render to a paid plan or use UptimeRobot to ping every 5 minutes
+
+---
+
+## Database — Supabase
+
+### Connection
+The backend uses the **transaction pooler URL** (port 5432) which is compatible with asyncpg. The direct connection URL (port 5432 on `db.*.supabase.co`) is for local scripts and migrations only.
+
+### Free tier behavior
+- Supabase **pauses after 7 days of inactivity**
+- The keepalive GitHub Action prevents this by querying the DB every 3 days via the `/health` endpoint
+- UptimeRobot pinging the backend every 5 minutes also keeps it active
+
+### To unpause manually
+1. Go to https://supabase.com → your project
+2. Click **Restore project** in the paused banner
+3. Wait ~2 minutes for it to come back up
+
+### Running migrations
+Use the direct connection URL from Supabase → Settings → Database → Direct connection:
 ```bash
-# From c:\Users\Asus\Desktop\ADMIT
-git init
-git add .
-git commit -m "Initial commit: ADMIT system"
-
-# Create a new repo on github.com named "admit-system"
-git remote add origin https://github.com/YOUR_USERNAME/admit-system.git
-git branch -M main
-git push -u origin main
+cd backend
+venv\Scripts\activate
+# Set DATABASE_URL to the direct connection URL temporarily
+python db/init_db.py
 ```
 
----
-
-## Step 2 — Set up Supabase (Database)
-
-1. Go to https://supabase.com and create a free account
-2. Click **New Project** → name it `admit-db`
-3. Set a strong database password and save it
-4. Once created, go to **SQL Editor**
-5. Paste the entire contents of `backend/db/supabase_migration.sql` and click **Run**
-6. Go to **Settings → Database** and copy the **Connection String (URI)**
-   - It looks like: `postgresql://postgres:[PASSWORD]@db.xxxx.supabase.co:5432/postgres`
-   - Change `postgresql://` to `postgresql+asyncpg://` for async support
-
----
-
-## Step 3 — Get Groq API Key
-
-1. Go to https://console.groq.com
-2. Sign up for a free account
-3. Go to **API Keys** → Create new API key
-4. Copy and save it securely
-
----
-
-## Step 4 — Deploy Backend to Render
-
-1. Go to https://render.com and sign in with GitHub
-2. Click **New → Web Service**
-3. Connect your `admit-system` GitHub repo
-4. Configure:
-   - **Name**: `admit-backend`
-   - **Root Directory**: `backend`
-   - **Runtime**: Python 3
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
-5. Add **Environment Variables**:
-   | Key | Value |
-   |-----|-------|
-   | `DATABASE_URL` | Your Supabase connection string (asyncpg) |
-   | `GROQ_API_KEY` | Your Groq API key |
-   | `JWT_SECRET` | Generate: `openssl rand -hex 32` |
-   | `JWT_EXPIRATION_HOURS` | `24` |
-   | `CONFIDENCE_THRESHOLD` | `0.35` |
-   | `ALLOWED_ORIGINS` | `https://your-app.vercel.app,http://localhost:5173` |
-6. Click **Create Web Service**
-7. Wait for deployment. Copy the Render URL (e.g. `https://admit-backend.onrender.com`)
-
----
-
-## Step 5 — Deploy Frontend to Vercel
-
-1. Go to https://vercel.com and sign in with GitHub
-2. Click **Add New → Project**
-3. Import your `admit-system` repo
-4. Configure:
-   - **Root Directory**: `frontend`
-   - **Framework Preset**: Vite
-   - **Build Command**: `npm run build`
-   - **Output Directory**: `dist`
-5. Add **Environment Variables**:
-   | Key | Value |
-   |-----|-------|
-   | `VITE_API_BASE_URL` | Your Render backend URL |
-6. Click **Deploy**
-7. Copy your Vercel URL (e.g. `https://admit-system.vercel.app`)
-
----
-
-## Step 6 — Update CORS on Render
-
-Go back to Render → Environment Variables and update:
+### Seeding KB content
+```bash
+cd backend
+venv\Scripts\activate
+python db/seed_data.py
 ```
-ALLOWED_ORIGINS = https://admit-system.vercel.app,http://localhost:5173
+Safe to re-run — skips existing categories and entries, only inserts missing ones.
+
+---
+
+## Groq API
+
+- Free tier: rate-limited but sufficient for thesis evaluation
+- Current model: `openai/gpt-oss-20b` (1000 t/s, free tier)
+- To change the model: update `MODEL_NAME` in `backend/services/llm.py`
+- Available models: https://console.groq.com/docs/models
+
+---
+
+## Keepalive — GitHub Actions
+
+`.github/workflows/keepalive.yml` runs every 3 days and pings `/health`.
+
+To trigger manually:
+1. Go to GitHub repo → **Actions** → **Keep Services Alive**
+2. Click **Run workflow → Run workflow**
+
+---
+
+## Monitoring — UptimeRobot
+
+UptimeRobot monitors `https://admit-backend.onrender.com/health` every 5 minutes.
+- If the backend goes down, you receive an email alert
+- 5-minute pings also prevent Render spin-down and Supabase pause
+
+---
+
+## Deploying Changes
+
+### Normal workflow
+```bash
+# Make your changes locally
+git add <files>
+git commit -m "your message"
+git push origin main
+# Vercel and Render auto-deploy from GitHub
 ```
 
-Then click **Save Changes** — Render will auto-redeploy.
+### After changing backend Python dependencies
+```bash
+# Update requirements.txt
+pip freeze > requirements.txt   # or edit manually with pinned versions
+git add backend/requirements.txt
+git commit -m "chore: update dependencies"
+git push origin main
+```
+
+### After adding new KB content
+Re-run the seed script locally (connects to live Supabase):
+```bash
+cd backend
+venv\Scripts\activate
+python db/seed_data.py
+```
+No redeployment needed — the KB is in the database, not in the code.
 
 ---
 
-## Step 7 — Verify Deployment
+## Rollback
 
-1. Open your Vercel URL → Chat interface should load
-2. Open `https://admit-backend.onrender.com/docs` → API docs should load
-3. Go to `/admin/login` and log in with `admin / admin123`
-4. **Change the admin password immediately!**
+To roll back to a previous version:
+```bash
+# Find the commit hash to roll back to
+git log --oneline -10
 
----
+# Reset to that commit (keep changes staged)
+git revert <commit-hash>
+git push origin main
+```
 
-## Summary of URLs
-
-| Service | URL |
-|---------|-----|
-| Chat Interface | `https://admit-system.vercel.app` |
-| Admin Dashboard | `https://admit-system.vercel.app/admin/login` |
-| API Docs | `https://admit-backend.onrender.com/docs` |
-| Health Check | `https://admit-backend.onrender.com/health` |
+Or via Vercel/Render dashboards — both keep deployment history and allow one-click rollback.
 
 ---
 
-## Notes
+## Checklist Before Going Live for Evaluation
 
-- Render free tier **spins down** after 15 mins of inactivity — first request takes ~30s to wake up
-- Supabase free tier has a 500MB database limit — more than enough for ADMIT
-- Groq free tier has rate limits — sufficient for thesis evaluation
-- Change `admin123` password after first login!
+- [ ] Change admin password from `admin123` to something strong
+- [ ] Verify `https://admit-backend.onrender.com/health` shows `kb_entries_active: 35`
+- [ ] Test at least 5 in-scope questions return real answers
+- [ ] Test 2 out-of-scope questions return the fallback message
+- [ ] Confirm UptimeRobot is actively monitoring
+- [ ] Remove or gate `/debug/retrieval` endpoint in `main.py` before public launch
+- [ ] Add a privacy notice to the chat page (RA 10173 compliance)

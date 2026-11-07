@@ -1,195 +1,145 @@
-# ADMIT - Conversational AI System for Admissions & Enrollment Assistance
+# ADMIT — Conversational AI Admissions Assistant
 
-ADMIT (Admissions & Inquiries Technology) is a web-based conversational AI assistant designed to answer admissions and enrollment questions for SACLI (St. Anthony College of Ligao Inc.) using Retrieval-Augmented Generation (RAG).
+ADMIT (Admissions & Inquiries Technology) is a web-based RAG chatbot that answers admissions and enrollment questions for **St. Anne College Lucena, Inc. (SACLI)**. It uses Retrieval-Augmented Generation to ground every answer in admin-managed knowledge base content, and falls back gracefully to office redirects when a question is out of scope.
 
-## System Overview
+---
 
-- **Frontend**: React + Vite + TailwindCSS
-- **Backend**: FastAPI (Python)
-- **Database**: PostgreSQL with pgvector extension
-- **LLM**: Groq API (Llama 3.1)
-- **Embeddings**: fastembed (BAAI/bge-small-en-v1.5)
+## Live URLs
 
-## Features
+| Service | URL |
+|---|---|
+| Chat Interface | https://admit-system.vercel.app |
+| Admin Dashboard | https://admit-system.vercel.app/admin/login |
+| Backend Health | https://admit-backend.onrender.com/health |
+| API Docs | https://admit-backend.onrender.com/docs |
 
-- Public chat interface with quick-reply buttons
-- RAG pipeline for grounded, accurate responses
-- Semantic search using pgvector
-- Admin dashboard for knowledge base management
-- Conversation logging and analytics
-- Fallback mechanism for out-of-scope queries
-- JWT authentication for admin users
+---
 
-## Prerequisites
+## Stack
 
-- Python 3.10+
+| Layer | Technology |
+|---|---|
+| Frontend | React 19 + Vite 8 + Tailwind CSS v4 |
+| Backend | FastAPI (Python 3.11) |
+| Database | PostgreSQL + pgvector (Supabase) |
+| Embeddings | fastembed — BAAI/bge-small-en-v1.5 (384-dim, local) |
+| LLM | Groq API — openai/gpt-oss-20b |
+| Auth | JWT (admin only) + Google OAuth (users) |
+| Deployment | Vercel (frontend) + Render (backend) |
+
+---
+
+## How it works
+
+1. User sends a message → backend embeds it with fastembed
+2. pgvector cosine similarity search finds the top 5 KB matches
+3. If best match score ≥ `CONFIDENCE_THRESHOLD` (default 0.35) → Groq generates a grounded response from the retrieved context
+4. If below threshold → polite fallback message directing user to the appropriate SACLI office
+5. Full conversation is logged (user message, bot response, matched KB IDs, fallback flag)
+
+---
+
+## Local Development
+
+### Prerequisites
+- Python 3.11
 - Node.js 18+
-- PostgreSQL 14+ with pgvector extension
-- Groq API key
+- A Supabase project with pgvector enabled (or the live DB credentials from `.env`)
 
-## Setup Instructions
+### Backend
 
-### Backend Setup
-
-1. Navigate to backend directory:
 ```bash
 cd backend
-```
-
-2. Create and activate virtual environment:
-```bash
-python -m venv venv
-# Windows
-venv\Scripts\activate
-# Mac/Linux
-source venv/bin/activate
-```
-
-3. Install dependencies:
-```bash
+py -3.11 -m venv venv
+venv\Scripts\activate        # Windows
 pip install -r requirements.txt
+# Copy root .env so the backend can find DATABASE_URL, GROQ_API_KEY, etc.
+uvicorn main:app --reload
 ```
 
-4. Create `.env` file (copy from `.env.example`):
-```bash
-cp .env.example .env
-```
+API docs available at http://localhost:8000/docs
 
-5. Configure environment variables in `.env`:
-   - `DATABASE_URL`: PostgreSQL connection string
-   - `GROQ_API_KEY`: Your Groq API key
-   - `JWT_SECRET`: Generate with `openssl rand -hex 32`
-   - `JWT_EXPIRATION_HOURS`: Token expiration (default: 24)
-   - `CONFIDENCE_THRESHOLD`: Confidence threshold for fallback (default: 0.35)
+### Seed the database (first time only)
 
-6. Initialize database:
 ```bash
-python db/init_db.py
+cd backend
+venv\Scripts\activate
 python db/seed_data.py
 ```
 
-7. Run development server:
-```bash
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
+### Frontend
 
-API documentation will be available at `http://localhost:8000/docs`
-
-### Frontend Setup
-
-1. Navigate to frontend directory:
 ```bash
 cd frontend
-```
-
-2. Install dependencies:
-```bash
 npm install
-```
-
-3. Create `.env` file:
-```bash
-VITE_API_BASE_URL=http://localhost:8000
-```
-
-4. Run development server:
-```bash
+# Create frontend/.env:
+# VITE_API_BASE_URL=http://localhost:8000
 npm run dev
 ```
 
-Frontend will be available at `http://localhost:5173`
+Frontend available at http://localhost:5173
+
+---
 
 ## Project Structure
 
-### Backend
 ```
-backend/
-├── routers/         # API route handlers
-├── services/        # Business logic (embedding, retrieval, LLM)
-├── models/          # SQLAlchemy ORM models
-├── auth/            # JWT authentication
-├── db/              # Database connection and initialization
-├── main.py          # FastAPI application entry point
-└── requirements.txt # Python dependencies
+ADMIT/
+├── backend/
+│   ├── auth/               # JWT handler + password hashing
+│   ├── db/                 # DB connection, init, seed data
+│   ├── models/             # SQLAlchemy ORM + Pydantic schemas
+│   ├── routers/            # chat, admin, auth, sessions endpoints
+│   ├── services/           # embeddings, retrieval, LLM
+│   ├── tests/              # pytest test suite
+│   ├── main.py             # FastAPI app entry point
+│   ├── requirements.txt
+│   ├── Dockerfile
+│   └── render.yaml
+├── frontend/
+│   ├── src/
+│   │   ├── api/            # chatApi, adminApi, sessionsApi
+│   │   ├── components/     # ChatWindow, MessageBubble, etc.
+│   │   ├── components/admin/ # KBTable, KBEditor, LogsViewer, AnalyticsDashboard
+│   │   ├── context/        # AuthContext
+│   │   └── pages/          # HomePage, ChatPage, LoginPage, AdminDashboard
+│   ├── public/             # Static assets (logo, bg-video)
+│   └── vercel.json
+├── .github/workflows/
+│   ├── deploy.yml          # CI — build + test on push
+│   └── keepalive.yml       # Scheduled ping every 3 days (prevents Supabase pause)
+├── ADMIT_Interview_Question_Bank.md   # Questions for gathering KB content from SACLI offices
+├── ADMIT_System_Build_Spec.md         # Original system design brief
+├── TESTING.md
+└── DEPLOYMENT.md
 ```
 
-### Frontend
-```
-frontend/
-├── src/
-│   ├── components/  # React components
-│   ├── pages/       # Page components
-│   ├── api/         # API client functions
-│   └── utils/       # Utility functions
-├── index.html
-└── package.json
-```
+---
 
-## Usage
+## Admin Access
 
-### For Students/Applicants (Public Chat)
+| Field | Value |
+|---|---|
+| URL | /admin/login |
+| Username | admin |
+| Password | See `.env` → `ADMIN_PASSWORD` |
 
-1. Open the chat interface at `http://localhost:5173`
-2. Type your question or click a quick-reply button
-3. Receive AI-generated responses grounded in SACLI knowledge base
-
-### For Administrators
-
-1. Log in at `http://localhost:5173/admin/login`
-2. Manage knowledge base entries (create, edit, deactivate)
-3. View conversation logs and analytics
-4. Monitor system performance (fallback rate, top unanswered questions)
-
-## Deployment
-
-### Backend (Render)
-
-1. Create `render.yaml` or use Dockerfile
-2. Set environment variables in Render dashboard
-3. Deploy to Render
-
-### Frontend (Vercel)
-
-1. Connect GitHub repository to Vercel
-2. Set build command: `npm run build`
-3. Set output directory: `dist`
-4. Set environment variable: `VITE_API_BASE_URL`
+---
 
 ## Environment Variables
 
-### Backend
-- `DATABASE_URL`: PostgreSQL connection string with pgvector
-- `GROQ_API_KEY`: Groq API key for LLM generation
-- `JWT_SECRET`: Secret key for JWT token signing
-- `JWT_EXPIRATION_HOURS`: JWT token expiration time (default: 24)
-- `CONFIDENCE_THRESHOLD`: Similarity threshold for fallback (default: 0.35)
-- `ALLOWED_ORIGINS`: CORS allowed origins (comma-separated)
+All variables live in the root `.env` file (gitignored). See `.env.example` for the full list. Key variables:
 
-### Frontend
-- `VITE_API_BASE_URL`: Backend API URL
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | Supabase PostgreSQL (pooler URL for Render) |
+| `GROQ_API_KEY` | Groq API key for LLM generation |
+| `JWT_SECRET` | Secret for signing admin JWT tokens |
+| `CONFIDENCE_THRESHOLD` | Similarity cutoff for fallback (default: 0.35) |
+| `ALLOWED_ORIGINS` | CORS whitelist — comma-separated |
 
-## Development
-
-- Backend auto-reloads on code changes (uvicorn --reload)
-- Frontend hot-reloads on code changes (Vite HMR)
-- API documentation available at `/docs` (FastAPI auto-generated)
-
-## Testing
-
-### Backend
-```bash
-pytest
-```
-
-### Frontend
-```bash
-npm run test
-```
-
-## License
-
-This project is part of a thesis for SACLI.
+---
 
 ## Author
 
-Ortega, D.M.C. - Thesis Project, 2026
+Ortega, D.M.C. — Thesis Project, SACLI, 2026
