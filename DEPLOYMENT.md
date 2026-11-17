@@ -1,11 +1,11 @@
-# ADMIT — Deployment Guide
+# ADMIT  EDeployment Guide
 
 ADMIT is deployed across three free-tier services:
 
 | Service | Platform | URL |
 |---|---|---|
 | Frontend | Vercel | https://admit-system.vercel.app |
-| Backend | Render | https://admit-backend.onrender.com |
+| Backend | Render | https://admit-system-backend.onrender.com |
 | Database | Supabase | PostgreSQL + pgvector |
 
 ---
@@ -23,32 +23,32 @@ The system is already deployed. This guide covers:
 ## Architecture
 
 ```
-Browser → Vercel (React SPA)
-              ↓ HTTPS REST
+Browser ↁEVercel (React SPA)
+              ↁEHTTPS REST
          Render (FastAPI)
-              ↓ asyncpg + SSL
+              ↁEasyncpg + SSL
          Supabase (PostgreSQL + pgvector)
-              ↓
+              ↁE
          Groq API (LLM generation)
 ```
 
 ---
 
-## Frontend — Vercel
+## Frontend  EVercel
 
 ### Auto-deploy
 Vercel is connected to the GitHub repo and auto-deploys on every push to `main`. No manual action needed.
 
 ### Manual redeploy
-1. Go to https://vercel.com → your project → **Deployments**
-2. Click the latest deployment → **Redeploy**
+1. Go to https://vercel.com ↁEyour project ↁE**Deployments**
+2. Click the latest deployment ↁE**Redeploy**
 
 ### Environment variables (Vercel dashboard)
 | Variable | Value |
 |---|---|
-| `VITE_API_BASE_URL` | `https://admit-backend.onrender.com` |
+| `VITE_API_BASE_URL` | `https://admit-system-backend.onrender.com` |
 
-To update: Vercel Dashboard → Project → **Settings → Environment Variables**
+To update: Vercel Dashboard ↁEProject ↁE**Settings ↁEEnvironment Variables**
 
 ### Build settings
 - Root directory: `frontend`
@@ -58,15 +58,15 @@ To update: Vercel Dashboard → Project → **Settings → Environment Variables
 
 ---
 
-## Backend — Render
+## Backend  ERender
 
 ### Auto-deploy
 Render is connected to the GitHub repo (`backend/` subdirectory) and auto-deploys on push to `main`.
 
-> ⚠️ If auto-deploy is not triggering, go to Render Dashboard → `admit-backend` → **Manual Deploy → Deploy latest commit**
+> ⚠�E�EIf auto-deploy is not triggering, go to Render Dashboard ↁE`admit-backend` ↁE**Manual Deploy ↁEDeploy latest commit**
 
 ### Environment variables (Render dashboard)
-Go to Render → `admit-backend` → **Environment**
+Go to Render ↁE`admit-backend` ↁE**Environment**
 
 | Variable | Value |
 |---|---|
@@ -86,13 +86,13 @@ After saving, Render triggers an automatic redeploy.
 - Runtime: Python 3.11
 
 ### Free tier behavior
-- Render spins down after **15 minutes of inactivity** → first request after sleep takes ~30s
+- Render spins down after **15 minutes of inactivity** ↁEfirst request after sleep takes ~30s
 - The GitHub Actions keepalive (`.github/workflows/keepalive.yml`) pings `/health` every 3 days, which is enough to prevent Supabase from pausing but NOT enough to keep Render warm 24/7
 - For always-on performance, upgrade Render to a paid plan or use UptimeRobot to ping every 5 minutes
 
 ---
 
-## Database — Supabase
+## Database  ESupabase
 
 ### Connection
 The backend uses the **transaction pooler URL** (port 5432) which is compatible with asyncpg. The direct connection URL (port 5432 on `db.*.supabase.co`) is for local scripts and migrations only.
@@ -103,12 +103,12 @@ The backend uses the **transaction pooler URL** (port 5432) which is compatible 
 - UptimeRobot pinging the backend every 5 minutes also keeps it active
 
 ### To unpause manually
-1. Go to https://supabase.com → your project
+1. Go to https://supabase.com ↁEyour project
 2. Click **Restore project** in the paused banner
 3. Wait ~2 minutes for it to come back up
 
 ### Running migrations
-Use the direct connection URL from Supabase → Settings → Database → Direct connection:
+Use the direct connection URL from Supabase ↁESettings ↁEDatabase ↁEDirect connection:
 ```bash
 cd backend
 venv\Scripts\activate
@@ -122,7 +122,7 @@ cd backend
 venv\Scripts\activate
 python db/seed_data.py
 ```
-Safe to re-run — skips existing categories and entries, only inserts missing ones.
+Safe to re-run  Eskips existing categories and entries, only inserts missing ones.
 
 ---
 
@@ -135,19 +135,19 @@ Safe to re-run — skips existing categories and entries, only inserts missing o
 
 ---
 
-## Keepalive — GitHub Actions
+## Keepalive  EGitHub Actions
 
 `.github/workflows/keepalive.yml` runs every 3 days and pings `/health`.
 
 To trigger manually:
-1. Go to GitHub repo → **Actions** → **Keep Services Alive**
-2. Click **Run workflow → Run workflow**
+1. Go to GitHub repo ↁE**Actions** ↁE**Keep Services Alive**
+2. Click **Run workflow ↁERun workflow**
 
 ---
 
-## Monitoring — UptimeRobot
+## Monitoring  EUptimeRobot
 
-UptimeRobot monitors `https://admit-backend.onrender.com/health` every 5 minutes.
+UptimeRobot monitors `https://admit-system-backend.onrender.com/health` every 5 minutes.
 - If the backend goes down, you receive an email alert
 - 5-minute pings also prevent Render spin-down and Supabase pause
 
@@ -180,7 +180,7 @@ cd backend
 venv\Scripts\activate
 python db/seed_data.py
 ```
-No redeployment needed — the KB is in the database, not in the code.
+No redeployment needed  Ethe KB is in the database, not in the code.
 
 ---
 
@@ -196,14 +196,14 @@ git revert <commit-hash>
 git push origin main
 ```
 
-Or via Vercel/Render dashboards — both keep deployment history and allow one-click rollback.
+Or via Vercel/Render dashboards  Eboth keep deployment history and allow one-click rollback.
 
 ---
 
 ## Checklist Before Going Live for Evaluation
 
 - [ ] Change admin password from `admin123` to something strong
-- [ ] Verify `https://admit-backend.onrender.com/health` shows `kb_entries_active: 35`
+- [ ] Verify `https://admit-system-backend.onrender.com/health` shows `kb_entries_active: 35`
 - [ ] Test at least 5 in-scope questions return real answers
 - [ ] Test 2 out-of-scope questions return the fallback message
 - [ ] Confirm UptimeRobot is actively monitoring

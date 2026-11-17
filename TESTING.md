@@ -1,4 +1,4 @@
-# ADMIT — Testing Guide
+# ADMIT  ETesting Guide
 
 This document covers how to test the ADMIT system: manual testing, backend unit/integration tests, and frontend build verification.
 
@@ -6,11 +6,11 @@ This document covers how to test the ADMIT system: manual testing, backend unit/
 
 ## 1. Live System Smoke Test
 
-The quickest check — hit the live endpoints directly.
+The quickest check  Ehit the live endpoints directly.
 
 ### Health check
 ```
-GET https://admit-backend.onrender.com/health
+GET https://admit-system-backend.onrender.com/health
 ```
 Expected response:
 ```json
@@ -25,13 +25,13 @@ If `embedding_model_loaded` is `false`, the first chat request will trigger a la
 
 ### Quick replies
 ```
-GET https://admit-backend.onrender.com/api/quick-replies
+GET https://admit-system-backend.onrender.com/api/quick-replies
 ```
 Should return 6 items (Admission Requirements, Enrollment Steps, Programs Offered, Tuition & Payment, Scholarships, Contact Info).
 
 ### Chat endpoint
 ```bash
-curl -X POST https://admit-backend.onrender.com/api/chat \
+curl -X POST https://admit-system-backend.onrender.com/api/chat \
   -H "Content-Type: application/json" \
   -d '{"message": "What programs does SACLI offer?"}'
 ```
@@ -54,10 +54,10 @@ Open https://admit-system.vercel.app and test the following:
 - "How do I apply for TESDA courses?"
 
 For each, verify:
-- ✅ Response contains relevant SACLI information
-- ✅ Source citation chips appear below the response
-- ✅ `was_fallback` is NOT shown (no "Redirected to office" note)
-- ✅ Markdown renders correctly (bold text, bullet points, links)
+- ✁EResponse contains relevant SACLI information
+- ✁ESource citation chips appear below the response
+- ✁E`was_fallback` is NOT shown (no "Redirected to office" note)
+- ✁EMarkdown renders correctly (bold text, bullet points, links)
 
 ### Out-of-scope questions (should return fallback)
 - "What is the weather today?"
@@ -65,8 +65,8 @@ For each, verify:
 - "Who is the president of the Philippines?"
 
 For each, verify:
-- ✅ Fallback message appears with office contact details
-- ✅ "Redirected to office" note is shown
+- ✁EFallback message appears with office contact details
+- ✁E"Redirected to office" note is shown
 
 ### Quick reply buttons
 - Click each of the 6 quick reply buttons
@@ -82,14 +82,14 @@ For each, verify:
 
 Log in at https://admit-system.vercel.app/admin/login
 
-Credentials: see `.env` → `ADMIN_USERNAME` / `ADMIN_PASSWORD`
+Credentials: see `.env` ↁE`ADMIN_USERNAME` / `ADMIN_PASSWORD`
 
 ### Knowledge Base Management
 - [ ] View the list of KB entries (should show 35 active entries)
 - [ ] Filter by department (IBED, SHS, HED, TESDA, GENERAL)
-- [ ] Create a new KB entry — verify it gets embedded and appears in search
-- [ ] Edit an existing entry — verify embedding is regenerated
-- [ ] Deactivate an entry — verify it no longer appears in chat responses
+- [ ] Create a new KB entry  Everify it gets embedded and appears in search
+- [ ] Edit an existing entry  Everify embedding is regenerated
+- [ ] Deactivate an entry  Everify it no longer appears in chat responses
 
 ### Conversation Logs
 - [ ] View logs after sending a few test messages
@@ -153,7 +153,7 @@ npm run build
 
 Expected output:
 ```
-✓ built in ~7s
+✁Ebuilt in ~7s
 dist/index.html       ~0.5 kB
 dist/assets/index.css ~45 kB
 dist/assets/index.js  ~450 kB
@@ -172,13 +172,13 @@ The `CONFIDENCE_THRESHOLD` env var (default `0.35`) controls when the bot falls 
 
 To tune it:
 1. Send test questions and check the similarity scores in Render logs
-2. If the bot is falling back on questions it should answer → lower the threshold (e.g. `0.25`)
-3. If the bot is answering questions it shouldn't → raise the threshold (e.g. `0.45`)
-4. Update in Render → Environment Variables → Save (triggers redeploy)
+2. If the bot is falling back on questions it should answer ↁElower the threshold (e.g. `0.25`)
+3. If the bot is answering questions it shouldn't ↁEraise the threshold (e.g. `0.45`)
+4. Update in Render ↁEEnvironment Variables ↁESave (triggers redeploy)
 
 The debug endpoint can help check similarity scores:
 ```
-GET https://admit-backend.onrender.com/debug/retrieval
+GET https://admit-system-backend.onrender.com/debug/retrieval
 ```
 
 ---

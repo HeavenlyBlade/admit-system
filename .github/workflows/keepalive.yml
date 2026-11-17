@@ -23,7 +23,7 @@ jobs:
             --max-time 60 \
             --retry 3 \
             --retry-delay 10 \
-            https://admit-backend.onrender.com/health)
+            https://admit-system-backend.onrender.com/health)
 
           echo "HTTP status: $RESPONSE"
 
@@ -34,7 +34,7 @@ jobs:
             sleep 30
             RETRY=$(curl -s -o /dev/null -w "%{http_code}" \
               --max-time 60 \
-              https://admit-backend.onrender.com/health)
+              https://admit-system-backend.onrender.com/health)
             echo "Retry HTTP status: $RETRY"
             if [ "$RETRY" != "200" ]; then
               echo "❌ Backend still unavailable after retry (status $RETRY)."
